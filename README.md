@@ -1,11 +1,14 @@
 #### ModeSDecoder - A Mode-S ADS-B Decoder in Java
 
-Sample Output (very poor antenna):
+This was written for the Mode-S Beast Receiver. This is a great little reciever that is based on an FPGA.
+
+The program drinks-in the serial port data (ignores the Mode-AC if enabled) and creates data structures in order to decode the bits into values we can all understand, and use for GUI or Database Applications.
 
 This is a hobby program I've played around with. It's sort of in the form of a Library that you would add to your GUI or Database program.
 
 I probably will write a MySQL Database application for it, down the road.
 
+Sample Output (very poor antenna):
 ```
 A1AC24 N207BG 42475 35.344666 -97.613468 2024-07-06 17:02:29.237
 A00CE0 RPA4535 5150 35.342010 -97.521114 2024-07-06 17:02:29.237
