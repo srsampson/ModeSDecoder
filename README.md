@@ -1,4 +1,5 @@
-#### ModeSDecoder - A Mode-S ADS-B Decoder in Java
+#### ModeSDecoder - A Mode-S and ADS-B Decoder in Java for Windows
+(Untested on other OS)
 
 This was written for the Mode-S Beast Receiver. This is a great little reciever that is based on an FPGA.
 
