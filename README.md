@@ -10,6 +10,8 @@ This is a hobby program I've played around with. It's in the form of a Library t
 I probably will write a MySQL Database application for it next.
 
 Sample Output (very poor antenna):
+
+**ICAO, Callsign, Altitude, Lat, Lon, UTC Timestamp**
 ```
 A1AC24 N207BG 42475 35.344666 -97.613468 2024-07-06 17:02:29.237
 A00CE0 RPA4535 5150 35.342010 -97.521114 2024-07-06 17:02:29.237
