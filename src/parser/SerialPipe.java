@@ -15,9 +15,9 @@ public final class SerialPipe extends Thread {
     private boolean EOF;
 
     public SerialPipe(InputStream i, PipedOutputStream o) {
-        this.input = i;
-        this.output = o;
-        this.EOF = false;
+        input = i;
+        output = o;
+        EOF = false;
 
         dataReceive = new Thread(this);
         dataReceive.setName("SerialPipe");

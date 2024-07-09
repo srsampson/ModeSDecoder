@@ -34,16 +34,14 @@ public final class PositionManager implements IConstants {
     private final ZuluMillis zulu;
     private final CPR cpr;
     private final DataBlockParser df;
-    private final ProcessTargets procTarget;
     private final Timer timer1;
     private final TimerTask task1;
 
-    public PositionManager(LatLon rxll, DataBlockParser d, ProcessTargets pt) {
+    public PositionManager(LatLon rxll, DataBlockParser d) {
         pos = new ConcurrentHashMap<>();
         zulu = new ZuluMillis();
         cpr = new CPR();
         df = d;
-        procTarget = pt;
         receiverLatLon = rxll;
 
         encodeCPR();
@@ -191,7 +189,7 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0 && latlon.getLon() != 0.0) {
-                            if (procTarget.hasTarget(acid)) {
+                            if (df.hasTarget(acid)) {
                                 df.updateTargetLatLon(acid, latlon, mode, zulu);
                             } else {
                                 df.createTargetLatLon(acid, tis, latlon, mode, zulu);
@@ -225,7 +223,7 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0 && latlon.getLon() != 0.0) {
-                            if (procTarget.hasTarget(acid)) {
+                            if (df.hasTarget(acid)) {
                                 df.updateTargetLatLon(acid, latlon, mode, zulu);
                             } else {
                                 df.createTargetLatLon(acid, tis, latlon, mode, zulu);

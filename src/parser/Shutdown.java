@@ -10,35 +10,40 @@ import java.io.InputStream;
 
 public final class Shutdown extends Thread {
 
-    private final BufferDataBlocks bd;
-    private final DataBlockParser dp;
-    private final SerialPipe br;
-    private final InputStream stream;
-    private final SerialPort port;
+    private final BufferDataBlocks bufferdatablock;
+    private final DataBlockParser datablockparser;
+    private final SerialPipe serialpipe;
+    private final Database database;
+    private final InputStream inputstream;
+    private final SerialPort serialport;
 
-    public Shutdown(SerialPort port, InputStream stream,  SerialPipe br, BufferDataBlocks bd, DataBlockParser dp) {
-        this.br = br;
-        this.bd = bd;
-        this.dp = dp;
-        this.port = port;
-        this.stream = stream;
+    public Shutdown(Database db, SerialPort port, InputStream stream,  SerialPipe br, BufferDataBlocks bd, DataBlockParser dp) {
+        database = db;
+        serialpipe = br;
+        bufferdatablock = bd;
+        datablockparser = dp;
+        serialport = port;
+        inputstream = stream;
     }
 
     @Override
     public void run() {
         System.out.println("Shutdown started");
-        this.br.close();
-        this.dp.close();
+
+        database.close();
         
-        this.bd.resetQueue(); // empty the list
-        this.bd.close();
+        serialpipe.close();
+        datablockparser.close();
+        
+        bufferdatablock.resetQueue(); // empty the list
+        bufferdatablock.close();
 
         try {
-            this.stream.close();
+            inputstream.close();
         } catch (IOException e) {
             // punt
         }
 
-        this.port.closePort();
+        serialport.closePort();
     }
 }

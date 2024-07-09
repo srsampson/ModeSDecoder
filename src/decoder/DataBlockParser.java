@@ -3,24 +3,35 @@
  */
 package decoder;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import parser.BufferDataBlocks;
 import parser.Config;
 import parser.DataBlock;
+import parser.ZuluMillis;
 
 /**
- * A class to decode the received packets and put them into targets
+ * A class to decode the received packets and put them into tracks
  *
  * This is the main entry point for applications
  */
 public final class DataBlockParser extends Thread {
 
+    private static final long RATE1 = 30L * 1000L;              // 30 seconds
+    private static final long RATE2 = 5L * 1000L;               // 5 seconds
+    //
+    private final ConcurrentHashMap<String, Track> targets;
+    //
     private final Thread process;
     private final BufferDataBlocks buf;
-    private final ProcessTargets procTarget;
     private final LatLon receiverLatLon;
     private final PositionManager pm;
+    private final NConverter nconverter;
     private DataBlock dbk;
+    //
     private static boolean EOF;
     private String data;
     private String acid;
@@ -46,15 +57,39 @@ public final class DataBlockParser extends Thread {
     private int subtype3;
     private int altitude;
     private int radarIID;
+    //
+    private final long timeout;
+    //
+    private final Config config;
+    private final ZuluMillis zulu;
+    //
+    private final Timer timer1;
+    private final Timer timer2;
+    //
+    private final TimerTask task1;
+    private final TimerTask task2;
 
-    public DataBlockParser(LatLon ll, BufferDataBlocks bd) {
-        this.buf = bd;
+    public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd) {
+        zulu = new ZuluMillis();
+        config = cf;
+        buf = bd;
         EOF = false;
 
-        receiverLatLon = ll;
-        procTarget = new ProcessTargets();
-        pm = new PositionManager(receiverLatLon, this, procTarget);
+        targets = new ConcurrentHashMap<>();
 
+        timeout = config.getDatabaseTargetTimeout() * 60L * 1000L;
+        receiverLatLon = ll;
+        pm = new PositionManager(receiverLatLon, this);
+        nconverter = new NConverter();
+
+        task1 = new UpdateReports();
+        timer1 = new Timer();
+        timer1.scheduleAtFixedRate(task1, 0L, RATE1);
+
+        task2 = new UpdateTrackQuality();
+        timer2 = new Timer();
+        timer2.scheduleAtFixedRate(task2, 10L, RATE2);
+        
         process = new Thread(this);
         process.setName("DataBlockParser");
         process.setPriority(Thread.NORM_PRIORITY);
@@ -67,17 +102,202 @@ public final class DataBlockParser extends Thread {
 
     public void close() {
         EOF = true;
+        timer1.cancel();
+        timer2.cancel();
+
         pm.close();
-        procTarget.close();
+    }
+
+    public synchronized boolean hasTarget(String acid) throws NullPointerException {
+        try {
+            return targets.containsKey(acid);
+        } catch (NullPointerException e) {
+            throw new NullPointerException("ProcessTargets::hasTarget Exception during containsKey " + e.getMessage());
+        }
+    }
+
+    public synchronized int getQueueSize() {
+        return targets.size();
+    }
+
+    public synchronized Track getTarget(String acid) throws NullPointerException {
+        try {
+            return targets.get(acid);
+        } catch (NullPointerException e) {
+            throw new NullPointerException("ProcessTargets::getTarget Exception during get " + e.getMessage());
+        }
+    }
+
+    /**
+     * Method to return a collection of all targets.
+     *
+     * @return a vector Representing all target objects.
+     * @throws java.lang.Exception
+     */
+    public synchronized List<Track> getAllTargets() throws Exception {
+        List<Track> result = new ArrayList<>();
+
+        try {
+            targets.values().stream().forEach((obj) -> {
+                result.add(obj);
+            });
+
+            return result;
+        } catch (Exception e) {
+            throw new Exception("ProcessTargets::getAllTargets Exception during add " + e.getMessage());
+        }
+    }
+
+    /**
+     * Find all the updated targets, and reset them to not updated for the next
+     * pass
+     *
+     * @return a vector representing all the targets that have been updated
+     * @throws java.lang.Exception
+     */
+    public synchronized List<Track> getAllUpdatedTargets() throws Exception {
+        List<Track> result = new ArrayList<>();
+
+        try {
+            targets.values().stream().forEach((tgt) -> {
+                if (tgt.getUpdated() == true) {
+                    tgt.setUpdated(false);
+                    tgt.setUpdatedTime(zulu.getUTCTime());
+
+                    targets.put(tgt.getAircraftID(), tgt);     // overwrites original target
+                    result.add(tgt);
+                }
+            });
+
+            return result;
+        } catch (Exception e) {
+            throw new Exception("ProcessTargets::getAllUpdatedTargets Exception during add " + e.getMessage());
+        }
+    }
+
+    /**
+     * After the Target object is created by DataBlockParser, we come here and put the
+     * target on the queue. This is also used to overwrite a target.
+     *
+     * @param acid a String representing the Aircraft ID
+     * @param obj an Object representing the Target data
+     */
+    public synchronized void addTarget(String acid, Track obj) throws NullPointerException {
+        try {
+            targets.put(acid, obj);
+        } catch (NullPointerException e) {
+            throw new NullPointerException("ProcessTargets::addTarget Exception during put " + e.getMessage());
+        }
+    }
+
+    public synchronized void removeTarget(String acid) throws NullPointerException {
+        try {
+            if (targets.containsKey(acid) == true) {
+                targets.remove(acid);
+            }
+        } catch (NullPointerException e) {
+            throw new NullPointerException("ProcessTargets::removeTarget Exception " + e.getMessage());
+        }
+    }
+
+    /*
+     * This will look through the Track table and delete entries that
+     * are over X minutes old.  In that case the target has probably landed
+     * or faded-out from coverage.
+     */
+    private class UpdateReports extends TimerTask {
+
+        private List<Track> targets;
+        private long targetTime;
+
+        @Override
+        public void run() {
+            long currentTime = zulu.getUTCTime();
+            long delta;
+
+            try {
+                targets = getAllTargets();
+            } catch (Exception te) {
+                return; // No targets found
+            }
+
+            for (Track id : targets) {
+                try {
+                    targetTime = id.getUpdatedTime();
+
+                    if (targetTime != 0L) {
+                        // find the reports that haven't been updated in X minutes
+                        delta = Math.abs(currentTime - id.getUpdatedTime());
+
+                        if (delta >= timeout) {
+                            removeTarget(id.getAircraftID());
+                        }
+                    }
+                } catch (NullPointerException e2) {
+                    // ignore
+                }
+
+                if (id.hasTCASAlerts()) {
+                    /*
+                     * Remove TCAS Alerts older than X minutes
+                     */
+                    id.removeTCAS(currentTime);
+                }
+            }
+        }
+    }
+
+    /*
+     * This will look through the Track local table and decrement track quality
+     * every 30 seconds that the lat/lon position isn't updated. This timer task
+     * is run every 5 seconds.
+     */
+    private class UpdateTrackQuality extends TimerTask {
+
+        private List<Track> targets;
+        private long delta;
+        private long currentTime;
+
+        @Override
+        public void run() {
+            currentTime = zulu.getUTCTime();
+            delta = 0L;
+            String acid;
+            
+            try {
+                targets = getAllTargets();
+            } catch (Exception te) {
+                return; // No targets found
+            }
+            
+            for (Track id : targets) {
+                try {
+                    if ((id != (Track) null) && (id.getTrackQuality() > 0)) {
+                        acid = id.getAircraftID();
+
+                        // find the idStatus reports that haven't been position updated in 30 seconds
+                        delta = Math.abs(currentTime - id.getUpdatedPositionTime());
+
+                        if (delta >= RATE1) {
+                            id.decrementTrackQuality();
+                            id.setUpdatedTime(currentTime);
+                            addTarget(acid, id);   // overwrite
+                        }
+                    }
+                } catch (NullPointerException e1) {
+                    System.err.println("DataBlockParser::updateTrackQuality Exception during iteration " + e1.getMessage());
+                }
+            }
+        }
     }
 
     public int getTargetQueueSize() {
-        return procTarget.getQueueSize();
+        return getQueueSize();
     }
 
-    public List<Target> getTargets() throws Exception {
+    public List<Track> getTargets() throws Exception {
         try {
-            return procTarget.getAllUpdatedTargets();
+            return getAllUpdatedTargets();
         } catch (Exception e) {
             throw new Exception(e);
         }
@@ -85,12 +305,12 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetMagneticHeadingIAS(String hexid, double head, double ias, int vvel, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setHeading(head);
             tgt.setIAS(ias);
             tgt.setVerticalRate(vvel);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -98,12 +318,12 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetMagneticHeadingTAS(String hexid, double head, double tas, int vvel, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setHeading(head);
             tgt.setTAS(tas);
             tgt.setVerticalRate(vvel);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -111,10 +331,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetCallsign(String hexid, String cs, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setCallsign(cs);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -122,11 +342,11 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetCallsign(String hexid, String cs, int category, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setCallsign(cs);
             tgt.setCategory(category);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -134,10 +354,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetAltitudeDF00(String hexid, int alt, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setAltitudeDF00(alt);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -145,10 +365,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetAltitudeDF04(String hexid, int alt, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setAltitudeDF04(alt);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -156,10 +376,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetAltitudeDF16(String hexid, int alt, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setAltitudeDF16(alt);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -167,10 +387,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetAltitudeDF17(String hexid, int alt, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setAltitudeDF17(alt);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -178,10 +398,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetAltitudeDF18(String hexid, int alt, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setAltitudeDF18(alt);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -189,10 +409,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetAltitudeDF20(String hexid, int alt, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setAltitudeDF20(alt);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -200,12 +420,12 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetGroundSpeedTrueHeading(String hexid, double gs, double th, int vs, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setGroundSpeed(gs);
-            tgt.setTrueHeading(th);
+            tgt.setGroundTrack(th);
             tgt.setVerticalRate(vs);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -213,11 +433,11 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetRadarID(String hexid, int iid, boolean si, long time) {
         try {
-            Target trk = procTarget.getTarget(hexid);
+            Track trk = getTarget(hexid);
             trk.setRadarIID(iid);
             trk.setSI(si);
             trk.setUpdatedTime(time);
-            procTarget.addTarget(hexid, trk);
+            addTarget(hexid, trk);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -225,10 +445,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetSquawk(String hexid, String squawk, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setSquawk(squawk);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -236,13 +456,11 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetBoolean(String hexid, boolean onground, boolean emergency, boolean alert, boolean spi, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
-            tgt.setEmergency(emergency);
-            tgt.setAlert(alert);
-            tgt.setSPI(spi);
-            tgt.setIsOnGround(onground);
+            Track tgt = getTarget(hexid);
+            tgt.setAlert(alert, emergency, spi);
+            tgt.setOnGround(onground);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -250,10 +468,10 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetOnGround(String hexid, boolean onground, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
-            tgt.setIsOnGround(onground);
+            Track tgt = getTarget(hexid);
+            tgt.setOnGround(onground);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -261,10 +479,10 @@ public final class DataBlockParser extends Thread {
 
     public void updateTargetLatLon(String hexid, LatLon latlon, int mode, long time) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
             tgt.setPosition(latlon, mode, time);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -272,11 +490,11 @@ public final class DataBlockParser extends Thread {
 
     public void createTargetLatLon(String hexid, boolean tis, LatLon latlon, int mode, long time) {
         try {
-            Target tgt = new Target(hexid, tis);
+            Track tgt = new Track(hexid, tis);
 
             tgt.setPosition(latlon, mode, time);
             tgt.setUpdatedTime(time);
-            procTarget.addTarget(hexid, tgt);
+            addTarget(hexid, tgt);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -284,11 +502,11 @@ public final class DataBlockParser extends Thread {
 
     private void updateTargetTCASAlert(String hexid, long time, long data56) {
         try {
-            Target tgt = procTarget.getTarget(hexid);
+            Track tgt = getTarget(hexid);
 
-            if (procTarget.hasTarget(hexid)) {
+            if (hasTarget(hexid)) {
                 tgt.insertTCAS(data56, time);
-                procTarget.addTarget(hexid, tgt);
+                addTarget(hexid, tgt);
             }
         } catch (NullPointerException np) {
             System.err.println(np);
@@ -326,7 +544,7 @@ public final class DataBlockParser extends Thread {
                         acid = df00.getACID();
 
                         try {
-                            if (procTarget.hasTarget(acid)) {           // must be valid then
+                            if (hasTarget(acid)) {           // must be valid then
                                 altitude = df00.getAltitude();
                                 isOnGround = df00.getIsOnGround();      // true if vs1 == 1
 
@@ -345,7 +563,7 @@ public final class DataBlockParser extends Thread {
                         acid = df04.getACID();
 
                         try {
-                            if (procTarget.hasTarget(acid)) {
+                            if (hasTarget(acid)) {
                                 altitude = df04.getAltitude();
                                 isOnGround = df04.getIsOnGround();
                                 alert = df04.getIsAlert();
@@ -367,7 +585,7 @@ public final class DataBlockParser extends Thread {
                         acid = df05.getACID();
 
                         try {
-                            if (procTarget.hasTarget(acid)) {
+                            if (hasTarget(acid)) {
                                 modeA = df05.getSquawk();
                                 isOnGround = df05.getIsOnGround();
                                 alert = df05.getIsAlert();
@@ -393,11 +611,14 @@ public final class DataBlockParser extends Thread {
                              * See if Target already exists
                              */
                             try {
-                                if (!procTarget.hasTarget(acid)) {
+                                if (!hasTarget(acid)) {
                                     /*
                                      * New Target
                                      */
-                                    procTarget.addTarget(acid, new Target(acid, false)); // false == not TIS
+                                    Track t = new Track(acid, false);  // false == not TIS
+                                    
+                                    t.setRegistration(nconverter.icao_to_n(acid));
+                                    addTarget(acid, t);
                                 }
                             } catch (NullPointerException np) {
                                 /*
@@ -420,7 +641,7 @@ public final class DataBlockParser extends Thread {
                         acid = df16.getACID();
 
                         try {
-                            if (procTarget.hasTarget(acid)) {
+                            if (hasTarget(acid)) {
                                 isOnGround = df16.getIsOnGround();
                                 altitude = df16.getAltitude();
 
@@ -454,11 +675,14 @@ public final class DataBlockParser extends Thread {
                              * See if Target already exists
                              */
                             try {
-                                if (!procTarget.hasTarget(acid)) {
+                                if (!hasTarget(acid)) {
                                     /*
                                      * New Target
                                      */
-                                    procTarget.addTarget(acid, new Target(acid, false));    // false == not TIS
+                                    Track t = new Track(acid, false);  // false == not TIS
+                                    
+                                    t.setRegistration(nconverter.icao_to_n(acid));
+                                    addTarget(acid, t);
                                 }
                             } catch (NullPointerException np) {
                                 /*
@@ -560,11 +784,14 @@ public final class DataBlockParser extends Thread {
                              * See if Target already exists
                              */
                             try {
-                                if (!procTarget.hasTarget(acid)) {
+                                if (!hasTarget(acid)) {
                                     /*
                                      * New Target
                                      */
-                                    procTarget.addTarget(acid, new Target(acid, true));    // true == TIS
+                                    Track t = new Track(acid, true);  // true == TIS
+                                    
+                                    t.setRegistration(nconverter.icao_to_n(acid));
+                                    addTarget(acid, t);
                                 }
                             } catch (NullPointerException np) {
                                 /*
@@ -662,7 +889,7 @@ public final class DataBlockParser extends Thread {
                         acid = df20.getACID();
 
                         try {
-                            if (procTarget.hasTarget(acid)) {
+                            if (hasTarget(acid)) {
                                 altitude = df20.getAltitude();
                                 isOnGround = df20.getIsOnGround();
                                 emergency = df20.getIsEmergency();
@@ -699,7 +926,7 @@ public final class DataBlockParser extends Thread {
                         acid = df21.getACID();
 
                         try {
-                            if (procTarget.hasTarget(acid)) {
+                            if (hasTarget(acid)) {
                                 modeA = df21.getSquawk();
                                 isOnGround = df21.getIsOnGround();
                                 emergency = df21.getIsEmergency();

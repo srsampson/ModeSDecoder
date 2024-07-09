@@ -41,11 +41,11 @@ public final class BeastMessageParser {
         int dataLength;
         int signalLevel;
 
-        ExtractResult(int endOfPacket, int startOfPacket, int dataLength, int signalLevel) {
-            this.endOfPacket = endOfPacket;
-            this.startOfPacket = startOfPacket;
-            this.dataLength = dataLength;
-            this.signalLevel = signalLevel;
+        ExtractResult(int ep, int sp, int dl, int sl) {
+            endOfPacket = ep;
+            startOfPacket = sp;
+            dataLength = dl;
+            signalLevel = sl;
         }
     }
 

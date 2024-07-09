@@ -17,33 +17,33 @@ public final class DataBlock {
     private final String mlat;
     private final String timestamp;
 
-    public DataBlock(long time, int signal, String mlat, String data) {
-        this.sqlTime = new Timestamp(0L);
-        this.time = time;
-        this.sqlTime.setTime(time);
-        this.timestamp = this.sqlTime.toString();
-        this.signalLevel = signal;
-        this.mlat = mlat;
-        this.data = data;
+    public DataBlock(long t, int s, String m, String d) {
+        sqlTime = new Timestamp(0L);
+        time = t;
+        sqlTime.setTime(t);
+        timestamp = sqlTime.toString();
+        signalLevel = s;
+        mlat = m;
+        data = d;
     }
 
     public int getSignalLevel() {
-        return this.signalLevel;
+        return signalLevel;
     }
 
     public String getData() {
-        return this.data;
+        return data;
     }
 
     public String getMlat() {
-        return this.mlat;
+        return mlat;
     }
 
     public long getUTCTime() {
-        return this.time;
+        return time;
     }
 
     public String getTimestamp() {
-        return this.timestamp;
+        return timestamp;
     }
 }

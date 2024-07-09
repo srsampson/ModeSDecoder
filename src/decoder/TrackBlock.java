@@ -4,20 +4,20 @@
 package decoder;
 
 /*
- * A Track Number consists of a 64-bit site assigned half, and an incrementing
- * 64-bit half. A global Track Number is thus 128-bits long.
+ * A Track Block consists of a 64-bit site assigned half, and an incrementing
+ * 64-bit half. A global Track Block is thus 128-bits long.
  */
-public final class TrackNumber {
+public final class TrackBlock {
 
-    private final long trackNumberHigh;       // a 64-bit fixed ID number for this site
-    private static long trackNumberLow;        // a 64-bit sequential number for this site
+    private final long trackNumberHigh;       // a 64-bit fixed ID number for this participant
+    private static long trackNumberLow;        // a 64-bit sequential number for this participant
     private final long startNumber;     // in case a number other than zero is desired
 
     /**
      * Instantiate starting at zero
      * @param val
      */
-    public TrackNumber(long val) {
+    public TrackBlock(long val) {
         trackNumberHigh = val;
         trackNumberLow = 0L;
         startNumber = 0L;
@@ -29,7 +29,7 @@ public final class TrackNumber {
      * @param val1
      * @param val2 a long representing the new track starting number
      */
-    public TrackNumber(long val1, long val2) {
+    public TrackBlock(long val1, long val2) {
         trackNumberHigh = val1;
         trackNumberLow = val2;
         startNumber = val2;

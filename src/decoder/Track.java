@@ -3,25 +3,972 @@
  */
 package decoder;
 
-public final class Track {
+import java.util.ArrayList;
+import java.util.List;
 
-    private final TrackNumber trackNumber;              // The network global track number
-    private Target target;                              // The target data object for this track
+/*
+ * This is the vehicle track object
+ */
+public final class Track implements IConstants {
 
-    public Track(TrackNumber tn, Target tgt) {
-        trackNumber = tn;
-        target = tgt;
+    private final List<TCAS> tcasAlerts;
+    //
+    private String acid;            // Aircraft ID
+    private String registration;    // N-Number if USA registered
+    private int mode;               // Track mode
+    private int positionMode;
+    private int trackQuality;       // 0 - 9 quality value (9 means Firm)
+    private int verticalRate;       // fps
+    private int verticalTrend;      // -1 = down, 0 = level, 1 = up
+    private final int[] trend = new int[10];
+    private static int trend_el = 0;
+    private double groundSpeed;      // kts
+    private double groundTrack;      // deg
+    private double groundSpeedComputed;
+    private double groundTrackComputed;
+    private double latitude;        // aircraft position latitude (- is south)
+    private double longitude;       // aircraft position longitude (- is west)
+    private double ias;
+    private double tas;
+    private double heading;
+    private String callsign;        // 8 character string
+    private String squawk;          // 4 digit octal code
+    //
+    private int version;
+    private int category;
+    private int altitudeDF00;
+    private int altitudeDF04;
+    private int altitudeDF16;
+    private int altitudeDF17;
+    private int altitudeDF18;
+    private int altitudeDF20;
+    private int radarIID;                       // IID is a II code (00 - 15)
+    private boolean si;                         // IID is a SI code (00 - 63)
+    //
+    private boolean alert;          // octal code changed bit
+    private boolean emergency;      // emergency bit
+    private boolean spi;            // ident bit
+    private boolean isOnGround;     // aircraft squat switch activated
+    private boolean isVirtOnGround; // Virtual onGround for MMS2
+    private boolean hijack;
+    private boolean comm_out;
+    //
+    private boolean hadAlert;
+    private boolean hadEmergency;
+    private boolean hadSPI;
+    //
+    private long updatedTime;        // zulu time object was updated
+    private long updatedPositionTime;// zulu time object lat/lon position was updated
+    private boolean updated;        // set on update, cleared on sent
+    private boolean updatePosition;
+    //
+    private boolean isLocal;            // Target is from one of our radars/not remote
+    private boolean isRelayed;          // Target has been relayed by a ground site (TIS-B)
+
+    /**
+     * A track is the complete data structure of the Aircraft ID (acid).
+     * It takes several different target reports to gather all the data,
+     * but this is where it is finally stored.
+     *
+     * @param ac a String representing the ICAO ID of the vehicle
+     * @param relayed a boolean representing a target that is relayed (TIS-B)
+     */
+    public Track(String ac, boolean relayed) {
+        isLocal = true;
+        isRelayed = relayed;
+        acid = ac;
+        registration = "";
+        version = 0;
+        category = 0;
+        mode = TRACK_MODE_NORMAL;
+        positionMode = POSITION_MODE_UNKNOWN;
+        groundSpeed = -999.0;
+        groundTrack = -999.0;
+        heading = -999.0;
+        groundSpeedComputed = -999.0;
+        groundTrackComputed = -999.0;
+        latitude = -999.0;
+        longitude = -999.0;
+        ias = -999.0;
+        tas = -999.0;
+        verticalRate = -9999;
+        verticalTrend = 0;
+        altitudeDF00 = -9999;
+        altitudeDF04 = -9999;
+        altitudeDF16 = -9999;
+        altitudeDF17 = -9999;
+        altitudeDF18 = -9999;
+        altitudeDF20 = -9999;
+        squawk = "";
+        callsign = "";
+        trackQuality = 0;
+        updatedPositionTime = 0L;
+        updatedTime = 0L;
+        alert = emergency = spi = hadAlert
+                = hadEmergency = hadSPI = si = hijack = comm_out = false;
+        updated = updatePosition = false;
+        isOnGround = isVirtOnGround = false;
+        tcasAlerts = new ArrayList<>();
     }
 
-    public Target getTarget() {
-        return target;
+    /**
+     * Method to increment track quality
+     */
+    public void incrementTrackQuality() {
+        if (trackQuality < 9) {
+            trackQuality++;
+            updated = true;
+        }
     }
 
-    public void updateTarget(Target val) {
-        target = val;
+    /**
+     * Method to decrement track quality
+     */
+    public void decrementTrackQuality() {
+        if (trackQuality > 0) {
+            trackQuality--;
+            updated = true;
+        }
     }
 
-    public TrackNumber getTrackNumber() {
-        return trackNumber;
+    /**
+     * Method to set the track quality
+     *
+     * @param val an integer Representing the track quality [0...9]
+     */
+    public void setTrackQuality(int val) {
+        if (trackQuality != val) {
+            trackQuality = val;
+            updated = true;
+        }
+    }
+
+    /**
+     * Method to return track quality
+     *
+     * @return an integer representing the track quality [0...9]
+     */
+    public int getTrackQuality() {
+        return trackQuality;
+    }
+
+    /**
+     * Method to check if the track has been updated
+     *
+     * @return boolean which signals if the track has been updated
+     */
+    public boolean getUpdated() {
+        return updated;
+    }
+
+    /**
+     * Method to flag a track as being updated
+     *
+     * @param val a boolean which signals the track has been updated
+     */
+    public void setUpdated(boolean val) {
+        updated = val;
+    }
+
+    /**
+     * Method to check if the track position has been updated
+     *
+     * @return boolean which signals if the track position has been updated
+     */
+    public boolean getUpdatePosition() {
+        return updatePosition;
+    }
+
+    /**
+     * Method to flag a track position as being updated or not updated
+     *
+     * @param val a boolean to set or reset the track position updated status
+     */
+    public void setUpdatePosition(boolean val) {
+        updatePosition = val;
+    }
+
+    /**
+     * Method to return the Aircraft Mode-S Hex ID
+     *
+     * @return a string Representing the track Mode-S Hex ID
+     */
+    public String getAircraftID() {
+        return acid;
+    }
+
+    /**
+     * Method to set the Aircraft Mode-S Hex ID
+     *
+     * @param val a string Representing the track Mode-S Hex ID
+     */
+    public void setAircraftID(String val) {
+        acid = val;
+    }
+
+    /**
+     * Method to return the Aircraft N-Number Registration
+     *
+     * @return a string Representing the track registration
+     */
+    public String getRegistration() {
+        return registration;
+    }
+
+    /**
+     * Method to set the Aircraft N-Number Registration
+     *
+     * @param val a string Representing the track registration
+     */
+    public void setRegistration(String val) {
+        registration = val;
+    }
+
+    /**
+     * Method to return the tracks updated position time in milliseconds
+     *
+     * @return a long Representing the track updated position time in
+     * milliseconds
+     */
+    public long getUpdatedPositionTime() {
+        return updatedPositionTime;
+    }
+
+    /**
+     * Method to return the tracks updated time in milliseconds
+     *
+     * @return a long Representing the track updated time in milliseconds
+     */
+    public long getUpdatedTime() {
+        return updatedTime;
+    }
+
+    /**
+     * Method to set the track updated time in milliseconds
+     *
+     * @param val a long Representing the track updated time in milliseconds
+     */
+    public void setUpdatedTime(long val) {
+        updatedTime = val;
+    }
+
+    public void setRadarIID(int val) {
+        if (radarIID != val) {
+            radarIID = val;
+            updated = true;
+        }
+    }
+
+    public int getRadarIID() {
+        return radarIID;
+    }
+
+    public void setSI(boolean val) {
+        if (si != val) {
+            si = val;
+            updated = true;
+        }
+    }
+
+    public boolean getSI() {
+        return si;
+    }
+
+    /**
+     * Method to return the track vertical rate in feet per second The
+     * resolution is +/- 64 fps, with descent being negative
+     *
+     * @return an integer Representing the track climb or descent rate
+     */
+    public int getVerticalRate() {
+        return verticalRate;
+    }
+
+    /**
+     * Method to set the track vertical rate in feet per second The resolution
+     * is +/- 64 fps, with descent being negative
+     *
+     * @param val an integer Representing the track climb or descent rate
+     */
+    public void setVerticalRate(int val) {
+        if (verticalRate != val) {
+            verticalRate = val;
+            updated = true;
+        }
+        
+        int vt = 0;
+
+        if (val > 192) {
+            trend[trend_el] = 1;
+        } else if (val < -192) {
+            trend[trend_el] = -1;
+        } else {
+            trend[trend_el] = 0;
+        }
+
+        trend_el = (trend_el + 1) % 10;
+
+        for (int i = 0; i < 10; i++) {
+            vt += trend[i];
+        }
+
+        if (vt > 0) {
+            verticalTrend = 1;
+        } else if (vt < 0) {
+            verticalTrend = -1;
+        } else {
+            verticalTrend = 0;
+        }
+    }
+
+    public synchronized int getVerticalTrend() {
+        return verticalTrend;
+    }
+
+    public void setGroundSpeed(double val) {
+        if (groundSpeed != val) {
+            groundSpeed = val;
+            updated = true;
+        }
+    }
+    
+    /**
+     * Method used to return the target ground speed in knots
+     *
+     * @return target groundspeed in knots
+     */
+    public double getGroundSpeed() {
+        return groundSpeed;
+    }
+
+    /**
+     * Method used to return the target ground track in degrees true north.
+     *
+     * @return target ground track in degrees true north
+     */
+    public double getGroundTrack() {
+        return groundTrack;
+    }
+
+    public void setGroundTrack(double val) {
+        if (groundTrack != val) {
+            groundTrack = val;
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to return the target computed ground speed in knots
+     *
+     * @return target groundspeed in knots
+     */
+    public double getComputedGroundSpeed() {
+        return groundSpeedComputed;
+    }
+
+    /**
+     * Method used to return the target computed ground track in degrees true
+     * north.
+     *
+     * @return target ground track in degrees true north
+     */
+    public double getComputedGroundTrack() {
+        return groundTrackComputed;
+    }
+
+    public void setComputedGroundSpeed(double val) {
+        groundSpeedComputed = val;
+    }
+
+    public void setComputedGroundTrack(double val) {
+        groundTrackComputed = val;
+    }
+    
+    /**
+     * Method to set all three velocities
+     *
+     * <p>
+     * Vertical Rate is set to zero for low values, as the aircraft tend to
+     * bobble up and down in turbulence, which generates network traffic. The
+     * Vertical Rate is negative for descent.
+     *
+     * @param val1 Ground Track in degrees
+     * @param val2 Ground Speed in knots
+     * @param val3 Vertical Rate in feet per second
+     */
+    public void setVelocityData(double val1, double val2, int val3) {
+        boolean changed = false;
+
+        if (groundTrack != val1) {
+            groundTrack = val1;
+            changed = true;
+        }
+
+        if (groundSpeed != val2) {
+            groundSpeed = val2;
+            changed = true;
+        }
+
+        if (verticalRate != val3) {
+            setVerticalRate(val3);
+            changed = true;
+        }
+
+        if (changed == true) {
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to set the DF00 altitude in feet MSL (29.92) The virtual
+     * onground status is also set if altitude reads 0 feet.
+     *
+     * @param val an integer Representing altitude in feet MSL or -9999 for null
+     */
+    public void setAltitudeDF00(int val) {
+        if (altitudeDF00 != val) {
+            altitudeDF00 = val;
+            isVirtOnGround = (val == 0);
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to set the DF04 altitude in feet MSL (29.92) The virtual
+     * onground status is also set if altitude reads 0 feet.
+     *
+     * @param val an integer Representing altitude in feet MSL or -9999 for null
+     */
+    public void setAltitudeDF04(int val) {
+        if (altitudeDF04 != val) {
+            altitudeDF04 = val;
+            isVirtOnGround = (val == 0);
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to set the DF16 altitude in feet MSL (29.92) The virtual
+     * onground status is also set if altitude reads 0 feet.
+     *
+     * @param val an integer Representing altitude in feet MSL or -9999 for null
+     */
+    public void setAltitudeDF16(int val) {
+        if (altitudeDF16 != val) {
+            altitudeDF16 = val;
+            isVirtOnGround = (val == 0);
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to set the DF17 altitude in feet MSL (29.92) The virtual
+     * onground status is also set if altitude reads 0 feet.
+     *
+     * @param val an integer Representing altitude in feet MSL or -9999 for null
+     */
+    public void setAltitudeDF17(int val) {
+        if (altitudeDF17 != val) {
+            altitudeDF17 = val;
+            isVirtOnGround = (val == 0);
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to set the DF18 altitude in feet MSL (29.92) The virtual
+     * onground status is also set if altitude reads 0 feet.
+     *
+     * @param val an integer Representing altitude in feet MSL or -9999 for null
+     */
+    public void setAltitudeDF18(int val) {
+        if (altitudeDF18 != val) {
+            altitudeDF18 = val;
+            isVirtOnGround = (val == 0);
+            updated = true;
+        }
+    }
+    
+    /**
+     * Method used to set the DF20 altitude in feet MSL (29.92) The virtual
+     * onground status is also set if altitude reads 0 feet.
+     *
+     * @param val an integer Representing altitude in feet MSL or -9999 for null
+     */
+    public void setAltitudeDF20(int val) {
+        if (altitudeDF20 != val) {
+            altitudeDF20 = val;
+            isVirtOnGround = (val == 0);
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to return the target altitude in feet MSL (29.92)
+     *
+     * @return an integer Representing the target altitude in feet MSL
+     */
+    public int getAltitude() {
+
+        /*
+         * Return the altitude in this order: DF04, DF00/DF16 (TCAS),
+         * DF17/DF18 (ADS-B)
+         * 
+         * Note: DF20 doesn't change often enough to display it
+         * 
+         * Note: TCAS DF00 and Mode-S DF04 are short packets, and more apt to be
+         * decoded than the long packets
+         * 
+         * Note: It's a toss really, as I see ADS-B and TCAS leading/lagging each other
+         * on climbs and descents.  Both are CRC checked.
+         */
+        if (altitudeDF04 != 0) {
+            return altitudeDF04;
+        } else if (altitudeDF00 != 0) {
+            return altitudeDF00;
+        } else if (altitudeDF16 != 0) {
+            return altitudeDF16;
+        } else if (altitudeDF17 != 0) {
+            return altitudeDF17;
+        } else if (altitudeDF18 != 0) {
+            return altitudeDF18;
+        }
+        
+        // punt
+        return 0;
+    }
+
+    public LatLon getPosition() {
+        return new LatLon(latitude, longitude);
+    }
+    
+    public int getPositionMode() {
+        return positionMode;
+    }
+    
+    /**
+     * Method used to return the target latitude in degrees (south is negative)
+     *
+     * @return a double Representing the target latitude
+     */
+    public double getLatitude() {
+        return latitude;
+    }
+
+    /**
+     * Method used to return the target longitude in degrees (west is negative)
+     *
+     * @return a double Representing the target longitude
+     */
+    public double getLongitude() {
+        return longitude;
+    }
+
+    /**
+     * Method used to set the target 2D position (latitude, longitude) (south
+     * and west are negative)
+     *
+     * @param latlon an object Representing the target lat/lon
+     * @param mode an int Representing the target mode
+     * @param utc a long timestamp
+     */
+    public void setPosition(LatLon latlon, int mode, long utc) {
+        /*
+         * Don't update with the same position
+         */
+
+        if ((Double.compare(longitude, latlon.getLon()) != 0) &&
+                Double.compare(latitude, latlon.getLat()) != 0) {
+            /*
+             * If a good position is followed by a 0.0 then keep the old
+             * position
+             */
+            if ((Double.compare(latlon.getLat(), 0.0) != 0) &&
+                    Double.compare(latlon.getLon(), 0.0) != 0) {
+                longitude = latlon.getLon();
+                latitude = latlon.getLat();
+                
+                positionMode = mode;
+                incrementTrackQuality();
+                updated = updatePosition = true;
+                updatedPositionTime = utc;
+            }
+        }
+    }
+
+    /**
+     * Method used to return the target callsign
+     *
+     * @return a string Representing the target callsign
+     */
+    public String getCallsign() {
+        return callsign;
+    }
+
+    /**
+     * Method used to set the target callsign
+     * Don't change the callsign to blank if it was a good value
+     * 
+     * @param val a string Representing the target callsign
+     */
+    public synchronized void setCallsign(String val) {
+        if (val.equals(callsign) == false) {
+            if (val.equals("") == false) { // keep the old, don't blank
+                callsign = val;
+                updated = true;
+            }
+        }
+    }
+
+    /**
+     * Method used to return the target octal 4-digit squawk
+     *
+     * @return a String Representing the target octal squawk
+     */
+    public String getSquawk() {
+        return squawk;
+    }
+
+    /**
+     * Method used to set the target octal 4-digit squawk
+     *
+     * @param val a String Representing the target octal squawk
+     */
+    public void setSquawk(String val) {
+        if (val.equals(squawk) == false) {
+            if (val.equals("0000") == false) {      // don't switch from a good code to a 0 code            squawk = val;
+                squawk = val;
+                updated = true;
+            
+                emergency = val.equals("7700");
+                hijack = val.equals("7500");
+                comm_out = val.equals("7600");
+            }
+        }
+    }
+
+    /**
+     * Method used to return the Emergency status
+     *
+     * @return a boolean Representing the Emergency status
+     */
+    public boolean getEmergency() {
+        return emergency;
+    }
+
+    /**
+     * Method used to return the SPI status
+     *
+     * @return a boolean Representing the SPI status
+     */
+    public boolean getSPI() {
+        return spi;
+    }
+
+    /**
+     * Method used to return the Hijack status
+     *
+     * @return a boolean Representing the Hijack status
+     */
+    public boolean getHijack() {
+        return hijack;
+    }
+
+    public boolean getCommOut() {
+        return comm_out;
+    }
+
+    public boolean getVirtualOnGround() {
+        return isVirtOnGround;
+    }
+
+    /**
+     * Method used to return the OnGround status
+     *
+     * @return a boolean Representing the OnGround status
+     */
+    public boolean getOnGround() {
+        return isOnGround;
+    }
+
+    /**
+     * Method to set the OnGround status
+     *
+     * @param val a boolean Representing the OnGround status
+     */
+    public void setOnGround(boolean val) {
+        if (isOnGround != val) {
+            if (val == true) {
+                if (getAltitude() > 10000) {        // I just pulled this number out of a hat
+                    // This is suspicious
+                    isOnGround = false;
+                    mode = TRACK_MODE_NORMAL;
+                } else {
+                    isOnGround = true;
+                    mode = TRACK_MODE_STANDBY;
+                }
+            } else {
+                mode = TRACK_MODE_NORMAL;
+                isOnGround = val;
+            }
+            
+            updated = true;
+        }
+    }
+
+    /**
+     * Method used to return the Alert status The Alert signals the 4-digit
+     * octal squawk has changed
+     *
+     * @return a boolean Representing the Alert status
+     */
+    public boolean getAlert() {
+        return alert;
+    }
+
+    /**
+     * Method to set all the boolean bits
+     *
+     * <p>
+     * The Alert bit is set if the 4-digit octal code is changed. The Emergency
+     * bit is set if the pilot puts in the emergency code The SPI bit is set if
+     * the pilots presses the Ident button.
+     *
+     * @param val1 a boolean Representing the status of the Alert
+     * @param val2 a boolean Representing the status of the Emergency
+     * @param val3 a boolean Representing the status of the SPI
+     */
+    public void setAlert(boolean val1, boolean val2, boolean val3) {
+        boolean changed = false;
+
+        if (alert != val1) {
+            if (val1 == true) {
+                mode = TRACK_MODE_IDENT;
+            } else {
+                mode = TRACK_MODE_NORMAL;
+            }
+
+            alert = val1;
+
+            if (alert == true) {
+                hadAlert = true;
+            }
+
+            changed = true;
+        }
+
+        if (emergency != val2) {
+            if (val2 == true) {
+                mode = TRACK_MODE_IDENT;
+            } else {
+                mode = TRACK_MODE_NORMAL;
+            }
+
+            emergency = val2;
+
+            if (emergency == true) {
+                hadEmergency = true;
+            }
+
+            changed = true;
+        }
+
+        if (spi != val3) {
+            if (val3 == true) {
+                mode = TRACK_MODE_IDENT;
+            } else {
+                mode = TRACK_MODE_NORMAL;
+            }
+
+            spi = val3;
+
+            if (spi == true) {
+                hadSPI = true;
+            }
+
+            changed = true;
+        }
+
+        if (changed == true) {
+            updated = true;
+        }
+    }
+
+    public boolean getHadAlert() {
+        return hadAlert;
+    }
+
+    public boolean getHadEmergency() {
+        return hadEmergency;
+    }
+
+    public boolean getHadSPI() {
+        return hadSPI;
+    }
+
+    public int getMode() {
+        return mode;
+    }
+
+    /*
+     * Transponder version detected
+     *
+     * 0 = Unknown
+     * 1 = Version 1
+     * 2 = Version 2
+     */
+    public int getVersion() {
+        return version;
+    }
+    
+    public void setVersion(int val) {
+        if (version != val) {
+            version = val;
+            updated = true;
+        }
+    }
+
+    public void setCategory(int val) {
+        if (category != val) {
+            category = val;
+            updated = true;
+        }
+    }
+
+    public int getCategory() {
+        return category;
+    }
+
+    public void setIAS(double val) {
+        if (ias != val) {
+            ias = val;
+            updated = true;
+        }
+    }
+
+    public double getIAS() {
+        return ias;
+    }
+
+    public void setTAS(double val) {
+        if (tas != val) {
+            tas = val;
+            updated = true;
+        }
+    }
+
+    public double getTAS() {
+        return tas;
+    }
+
+    /*
+     * This is some ADS-B bo-jive
+     */
+    public void setHeading(double val) {
+        if (heading != val) {
+            heading = val;
+            updated = true;
+        }
+    }
+
+    public double getHeading() {
+        return heading;
+    }
+
+    public void setLocal(boolean val) {
+        isLocal = val;
+    }
+
+    public boolean getLocal() {
+        return isLocal;
+    }
+
+    public void setRelayed(boolean val) {
+        isRelayed = val;
+    }
+
+    public boolean getRelayed() {
+        return isRelayed;
+    }
+
+    /**
+     * Method to determine if there are any TCAS alerts on the queue
+     *
+     * @return a boolean Representing whether there are TCAS alerts on the queue
+     */
+    public synchronized boolean hasTCASAlerts() {
+        return !tcasAlerts.isEmpty();
+    }
+
+    /**
+     * Method to return the number of TCAS alerts on the queue
+     *
+     * @return an integer representing the number of TCAS alerts on the queue
+     */
+    public synchronized int getNumberOfTCASAlerts() {
+        return tcasAlerts.size();
+    }
+
+    /*
+     * Method to add a new TCAS alert for this target at the tail of the queue
+     */
+    public synchronized void insertTCAS(long data56, long time) {
+        TCAS tcas = new TCAS(data56, time, getAltitude());
+
+        /*
+         * Some TCAS are just advisory, no RA generated
+         * So we keep these off the table, as they are basically junk.
+         * 
+         * TCAS class only sets time if RA is active.
+         */
+        if (tcas.getUpdateTime() == 0L) {
+            return;
+        }
+
+        try {
+            tcasAlerts.add(tcas);
+        } catch (UnsupportedOperationException | IllegalArgumentException | ClassCastException | NullPointerException e) {
+            System.err.println("Target::insertTCAS Exception during addElement " + e.toString());
+        }
+    }
+
+    /**
+     * Method to return a list TCAS alerts
+     *
+     * @return a vector of TCAS alert objects
+     */
+    public synchronized List<TCAS> getTCASAlerts() {
+        List<TCAS> result = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < tcasAlerts.size(); i++) {
+                if (tcasAlerts.get(i).getThreatTerminated() == false) {
+                    result.add(tcasAlerts.get(i));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Target::getTCASAlerts Exception during addElement " + e.toString());
+        }
+
+        return result;
+    }
+
+    /*
+     * Method to remove expired TCAS alerts from queue
+     * 
+     * @param t a long representing the current time in milliseconds
+     */
+    public synchronized void removeTCAS(long t) {
+        t -= 60000L;         // subtract 60 seconds
+
+        try {
+            for (int i = 0; i < tcasAlerts.size(); i++) {
+                if (tcasAlerts.get(i).getUpdateTime() <= t) {
+                        tcasAlerts.remove(i);
+                }
+            }
+        } catch (Exception e2) {
+            System.err.println("Target::removeTCAS Exception during remove " + e2.toString());
+        } 
     }
 }

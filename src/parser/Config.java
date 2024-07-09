@@ -20,6 +20,8 @@ public final class Config {
     private String databasePassword;
     //
     private int amplitude;
+    private int radarscan;
+    private int radarid;
     //
     private double latitude;    // degrees
     private double longitude;   // degrees
@@ -35,8 +37,13 @@ public final class Config {
         String temp;
 
         commPort = "COM4";
+        radarscan = 3;
+        radarid = 0;
         databaseTargetTimeout = 3;    // 3 minutes
         amplitude = 0;
+        //
+        latitude = 0.0;
+        longitude = 0.0;
         //
         Props = null;
         //
@@ -62,6 +69,36 @@ public final class Config {
          * none given.
          */
         if (Props != null) {
+            temp = Props.getProperty("radar.id");
+            if (temp == null) {
+                radarid = 0;
+                System.out.println("radar.id not set, set to 0");
+            } else {
+                try {
+                    radarid = Integer.parseInt(temp.trim());
+                } catch (NumberFormatException e3) {
+                    radarid = 0;
+                }
+            }
+            
+            temp = Props.getProperty("radar.scan");
+            if (temp == null) {
+                radarscan = 3;
+                System.out.println("radar.scan not set, set to 3 seconds");
+            } else {
+                try {
+                    radarscan = Integer.parseInt(temp.trim());
+
+                    if (radarscan < 1) {
+                        radarscan = 1;
+                    } else if (radarscan > 13) {
+                        radarscan = 13;
+                    }
+                } catch (NumberFormatException e4) {
+                    radarscan = 3;
+                }
+            }
+
             temp = Props.getProperty("comm.port");
             if (temp == null) {
                 commPort = "COM4";
@@ -224,5 +261,19 @@ public final class Config {
 
     public double getStationLongitude() {
         return longitude;
+    }
+
+    /**
+     * Getter to provide for multiple detector data in the same database Each
+     * network connect should be configured with a different radar ID
+     *
+     * @return a int Representing a numeric radar ID
+     */
+    public int getRadarID() {
+        return this.radarid;
+    }
+
+    public int getRadarScanTime() {
+        return this.radarscan;
     }
 }

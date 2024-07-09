@@ -14,22 +14,22 @@ public class ExtractedBytes {
     }
 
     public ExtractedBytes setMessageBytes(byte[] bytes) {
-        this.messageBytes = bytes;
+        messageBytes = bytes;
         return this;
     }
 
     public ExtractedBytes setMlatBytes(byte[] bytes) {
-        this.mlatBytes = bytes;
+        mlatBytes = bytes;
         return this;
     }
 
-    public ExtractedBytes setSignalLevel(int signalLevel) {
-        this.signalLevel = signalLevel;
+    public ExtractedBytes setSignalLevel(int sl) {
+        signalLevel = sl;
         return this;
     }
 
     public int getSignalLevel() {
-        return this.signalLevel;
+        return signalLevel;
     }
 
     public byte[] getMlatBytes() {
