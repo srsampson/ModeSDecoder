@@ -479,7 +479,7 @@ public final class Database extends Thread {
             update = String.format(
                     "INSERT INTO targethistory (flight_id,radar_id,acid,utcdetect,utcfadeout,altitude,groundSpeed,"
                     + "groundTrack,gsComputed,gtComputed,callsign,latitude,longitude,verticalRate,verticalTrend,squawk,alert,emergency,spi,onground,"
-                    + "hijack,comm_out,hadAlert,hadEmergency,hadSPI) SELECT flight_id,radar_id,acid,utcdetect,utcupdate,"
+                    + "hijack,comm_out,hadAlert,hadEmergency,hadSPI) SELECT flight_id,radar_id,acid,FROM_UNIXTIME(utcdetect/1000),FROM_UNIXTIME(utcupdate/1000),"
                     + "altitude,groundSpeed,groundTrack,gsComputed,gtComputed,callsign,latitude,longitude,verticalRate,verticalTrend,squawk,alert,"
                     + "emergency,spi,onground,hijack,comm_out,hadAlert,hadEmergency,hadSPI FROM target WHERE target.utcupdate <= %d",
                     timeout);
