@@ -10,3 +10,7 @@ The database is designed so that as new targets come in, their Mode-S ICAO numbe
 Currently it only updates the registration (N-Number) for USA aircraft, as they are assigned 1:1, and I don't have any info on other countries. I don't do an Internet lookup, as most sites don't allow it for free.
 
 ![Sample Query](sample.png)
+
+With a database, you can then grab data and display it on a GUI for example (my antenna is on my desk and is not very good).
+
+![Sample Display](radar.png)
