@@ -1,10 +1,10 @@
 CREATE DATABASE  IF NOT EXISTS `modes` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
 USE `modes`;
--- MySQL dump 10.13  Distrib 8.0.21, for Linux (x86_64)
+-- MySQL dump 10.13  Distrib 8.0.38, for Win64 (x86_64)
 --
 -- Host: localhost    Database: modes
 -- ------------------------------------------------------
--- Server version	8.0.21-0ubuntu0.20.04.4
+-- Server version	8.4.1
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -84,7 +84,7 @@ CREATE TABLE `target` (
   `verticalRate` int DEFAULT NULL,
   `verticalTrend` tinyint(1) NOT NULL DEFAULT '0',
   `quality` int DEFAULT NULL,
-  `squawk` int unsigned DEFAULT NULL,
+  `squawk` varchar(4) DEFAULT NULL,
   `alert` tinyint(1) NOT NULL DEFAULT '0',
   `emergency` tinyint(1) NOT NULL DEFAULT '0',
   `spi` tinyint(1) NOT NULL DEFAULT '0',
@@ -103,9 +103,9 @@ CREATE TABLE `target` (
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8 */ ;
-/*!50003 SET character_set_results = utf8 */ ;
-/*!50003 SET collation_connection  = utf8_general_ci */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb3_general_ci */ ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'NO_AUTO_VALUE_ON_ZERO' */ ;
 DELIMITER ;;
@@ -125,9 +125,9 @@ DELIMITER ;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8 */ ;
-/*!50003 SET character_set_results = utf8 */ ;
-/*!50003 SET collation_connection  = utf8_general_ci */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb3_general_ci */ ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'NO_AUTO_VALUE_ON_ZERO' */ ;
 DELIMITER ;;
@@ -188,7 +188,7 @@ CREATE TABLE `targethistory` (
   `longitude` double DEFAULT NULL,
   `verticalRate` int DEFAULT NULL,
   `verticalTrend` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Calculated Vertical Trend -1 = down, 0 = level, 1 = up',
-  `squawk` int unsigned DEFAULT NULL,
+  `squawk` varchar(4) DEFAULT NULL,
   `alert` tinyint(1) NOT NULL DEFAULT '0',
   `emergency` tinyint(1) NOT NULL DEFAULT '0',
   `spi` tinyint(1) NOT NULL DEFAULT '0',
@@ -206,6 +206,10 @@ CREATE TABLE `targethistory` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping events for database 'modes'
+--
+
+--
 -- Dumping routines for database 'modes'
 --
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -218,4 +222,4 @@ CREATE TABLE `targethistory` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2020-08-28 17:57:19
+-- Dump completed on 2024-07-09 10:18:49

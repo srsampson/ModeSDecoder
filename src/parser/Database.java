@@ -32,10 +32,10 @@ public final class Database extends Thread {
     private Config config;
     private String acid;
     private int radarid;
-    private int targetTimeout;
+    private final long targetTimeout;
     private long radarscan;
     //
-    private Timer targetTimer;
+    private final Timer targetTimer;
     //
     private final TimerTask targetTimeoutTask;
     private final ZuluMillis zulu;
@@ -48,13 +48,11 @@ public final class Database extends Thread {
         radarscan = (long) cf.getRadarScanTime() * 1000L;
         acid = "";
         EOF = false;
-
-        targetTimeout = config.getDatabaseTargetTimeout();
-        targetTimeoutTask = new TargetTimeoutThread(targetTimeout);
-
-        targetTimer = new Timer();
-        targetTimer.scheduleAtFixedRate(targetTimeoutTask, 0L, RATE); // Update targets every 30 seconds
-
+        
+        database = new Thread(this);
+        database.setName("Database");
+        database.setPriority(Thread.NORM_PRIORITY);
+        
         String connectionURL = config.getDatabaseURL();
 
         Properties properties = new Properties();
@@ -81,9 +79,11 @@ public final class Database extends Thread {
             System.exit(0);
         }
 
-        database = new Thread(this);
-        database.setName("Database");
-        database.setPriority(Thread.NORM_PRIORITY);
+        targetTimeout = config.getDatabaseTargetTimeout();
+        targetTimeoutTask = new TargetTimeoutThread(targetTimeout);
+
+        targetTimer = new Timer();
+        targetTimer.scheduleAtFixedRate(targetTimeoutTask, 0L, RATE); // Update targets every 30 seconds
     }
 
     public void startup() {
@@ -454,14 +454,14 @@ public final class Database extends Thread {
 
         private long time;
         private long timeout;
-        private final int min;
+        private final long min;
 
         /**
          * Clean up the target table
          *
-         * @param to an int Representing the timeout in minutes
+         * @param to a long Representing the timeout in minutes
          */
-        public TargetTimeoutThread(int to) {
+        public TargetTimeoutThread(long to) {
             min = to;
         }
 
