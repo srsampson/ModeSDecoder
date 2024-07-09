@@ -2,7 +2,7 @@ CREATE DATABASE  IF NOT EXISTS `modes` /*!40100 DEFAULT CHARACTER SET utf8mb4 CO
 USE `modes`;
 -- MySQL dump 10.13  Distrib 8.0.21, for Linux (x86_64)
 --
--- Host: localhost    Database: adsb
+-- Host: localhost    Database: modes
 -- ------------------------------------------------------
 -- Server version	8.0.21-0ubuntu0.20.04.4
 
@@ -206,11 +206,7 @@ CREATE TABLE `targethistory` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping events for database 'adsb'
---
-
---
--- Dumping routines for database 'adsb'
+-- Dumping routines for database 'modes'
 --
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
