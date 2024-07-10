@@ -58,8 +58,9 @@ public final class Database extends Thread {
         Properties properties = new Properties();
         properties.setProperty("user", config.getDatabaseLogin());
         properties.setProperty("password", config.getDatabasePassword());
-        properties.setProperty("useSSL", "false");
-        properties.setProperty("serverTimezone", "UTC");
+        properties.setProperty("useSSL", "false");                    // added in Jun 2024
+        properties.setProperty("allowPublicKeyRetrieval", "true");    // added in July 2024
+        properties.setProperty("serverTimezone", "UTC");              // added in Jun 2024
 
         /*
          * You need the ODBC MySQL driver library in the same directory you have
