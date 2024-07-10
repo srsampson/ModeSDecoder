@@ -1,4 +1,8 @@
 #### ModeSDecoder - A Mode-S and ADS-B Decoder in Java for Windows and MySQL
+
+Note: After my Windows Rebooted and Downloaded Updates, the MySQL no longer works, and clients can't login.
+Did I mention I hate MySQL? Anyway, I'll probably port this to a different database, as MySQL is not for hobbyists.
+
 This was written for the Mode-S Beast Receiver. This is a great little reciever that is based on an FPGA. It would be difficult to adapt it to another receiver, as these things all have different binary protocols to snag the data off of them.
 
 The program drinks-in the serial port data (ignores the Mode-AC if enabled) and creates data structures in order to decode the bits into values we can all understand, and use for a Database Application.
