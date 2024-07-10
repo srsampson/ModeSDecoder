@@ -1,4 +1,4 @@
-#### ModeSDecoder - A Mode-S and ADS-B Decoder in Java for Windows and MySQL
+#### ModeSDecoder - A Mode-S and ADS-B Decoder in Java for Windows
 
 Note: After my Windows Rebooted and Downloaded Updates, the MySQL no longer works, and clients can't login.
 Did I mention I hate MySQL? Anyway, I'll probably port this to a different database, as MySQL is not for hobbyists.
