@@ -3,7 +3,7 @@
  */
 package parser;
 
-public class ExtractedBytes {
+public final class ExtractedBytes {
 
     private byte[] messageBytes;
     private byte[] mlatBytes;

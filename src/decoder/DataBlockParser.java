@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import parser.BufferDataBlocks;
 import parser.Config;
 import parser.DataBlock;
+import parser.Database;
 import parser.ZuluMillis;
 
 /**
@@ -63,6 +64,8 @@ public final class DataBlockParser extends Thread {
     private final Config config;
     private final ZuluMillis zulu;
     //
+    private Database db;
+    //
     private final Timer timer1;
     private final Timer timer2;
     //
@@ -73,6 +76,7 @@ public final class DataBlockParser extends Thread {
         zulu = new ZuluMillis();
         config = cf;
         buf = bd;
+        db = (Database) null;
         EOF = false;
 
         targets = new ConcurrentHashMap<>();
@@ -106,6 +110,10 @@ public final class DataBlockParser extends Thread {
         timer2.cancel();
 
         pm.close();
+    }
+
+    public void setDatabase(Database val) {
+        db = val;
     }
 
     public synchronized boolean hasTarget(String acid) throws NullPointerException {
@@ -963,6 +971,13 @@ public final class DataBlockParser extends Thread {
                     default:
                         System.err.printf("DataBlockParser::decodeData DF: [%d] %s%n", df5, data);
                 }
+            } // while (buf.getQueueSize() > 0)
+
+            /*
+             * Now update the database
+             */
+            if (db != null) {
+                db.updateDatabase();
             }
 
             try {

@@ -93,12 +93,11 @@ public final class ModeSDecoder {
         parser = new DataBlockParser(config, receiverLatLon, bufferData);  // thread to create List of targets from blocks
         db = new Database(config, parser);
 
+        Shutdown sh = new Shutdown(db, port, comm_input, recv, bufferData, parser);
+        Runtime.getRuntime().addShutdownHook(sh);
+
         recv.start();
         bufferData.start();
         parser.start();
-        db.start();
-
-        Shutdown sh = new Shutdown(db, port, comm_input, recv, bufferData, parser);
-        Runtime.getRuntime().addShutdownHook(sh);
     }
 }
