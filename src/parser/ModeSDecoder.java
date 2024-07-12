@@ -19,6 +19,7 @@ import java.io.PipedOutputStream;
 import java.util.Locale;
 
 public final class ModeSDecoder {
+
     private static BufferDataBlocks bufferData;
     private static LatLon receiverLatLon;
     //
@@ -30,7 +31,7 @@ public final class ModeSDecoder {
     private static PipedOutputStream beast_output;
     private static PipedInputStream beast_input;
     private static InputStream comm_input;
-    private static Database db;
+    private static SerialPort port;
 
     public static void main(String[] args) {
         /*
@@ -65,7 +66,7 @@ public final class ModeSDecoder {
         /*
          * Connect to the Serial Communications Port
          */
-        var port = SerialPort.getCommPort(config.getCommPort());
+        port = SerialPort.getCommPort(config.getCommPort());
 
         if (port.openPort() == false) {
             System.err.println("Fatal: Can't initialize Serial Port");
@@ -91,9 +92,8 @@ public final class ModeSDecoder {
         recv = new SerialPipe(comm_input, beast_output);   // grab Beast data and buffer between threads
         bufferData = new BufferDataBlocks(beast_input, config);     // thread to queue beast data into blocks
         parser = new DataBlockParser(config, receiverLatLon, bufferData);  // thread to create List of targets from blocks
-        db = new Database(config, parser);
 
-        Shutdown sh = new Shutdown(db, port, comm_input, recv, bufferData, parser);
+        Shutdown sh = new Shutdown(port, comm_input, recv, bufferData, parser);
         Runtime.getRuntime().addShutdownHook(sh);
 
         recv.start();

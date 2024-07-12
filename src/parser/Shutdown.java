@@ -13,12 +13,10 @@ public final class Shutdown extends Thread {
     private final BufferDataBlocks bufferdatablock;
     private final DataBlockParser datablockparser;
     private final SerialPipe serialpipe;
-    private final Database database;
     private final InputStream inputstream;
     private final SerialPort serialport;
 
-    public Shutdown(Database db, SerialPort port, InputStream stream,  SerialPipe br, BufferDataBlocks bd, DataBlockParser dp) {
-        database = db;
+    public Shutdown(SerialPort port, InputStream stream,  SerialPipe br, BufferDataBlocks bd, DataBlockParser dp) {
         serialpipe = br;
         bufferdatablock = bd;
         datablockparser = dp;
@@ -29,8 +27,6 @@ public final class Shutdown extends Thread {
     @Override
     public void run() {
         System.out.println("Shutdown started");
-
-        database.close();
         
         serialpipe.close();
         datablockparser.close();

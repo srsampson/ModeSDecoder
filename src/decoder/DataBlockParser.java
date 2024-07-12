@@ -3,15 +3,20 @@
  */
 package decoder;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import parser.BufferDataBlocks;
 import parser.Config;
 import parser.DataBlock;
-import parser.Database;
 import parser.ZuluMillis;
 
 /**
@@ -31,8 +36,23 @@ public final class DataBlockParser extends Thread {
     private final LatLon receiverLatLon;
     private final PositionManager pm;
     private final NConverter nconverter;
+    private final ZuluMillis zulu;
     private DataBlock dbk;
     //
+    private Connection db1;
+    private Connection db2;
+    private Statement query;
+    private Statement querytt;
+    private final Config config;
+
+    private int radarid;
+    private final long targetTimeout;
+    private long radarscan;
+    //
+    private final Timer targetTimer;
+    //
+    private final TimerTask targetTimeoutTask;
+    
     private static boolean EOF;
     private String data;
     private String acid;
@@ -59,13 +79,6 @@ public final class DataBlockParser extends Thread {
     private int altitude;
     private int radarIID;
     //
-    private final long timeout;
-    //
-    private final Config config;
-    private final ZuluMillis zulu;
-    //
-    private Database db;
-    //
     private final Timer timer1;
     private final Timer timer2;
     //
@@ -75,16 +88,51 @@ public final class DataBlockParser extends Thread {
     public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd) {
         zulu = new ZuluMillis();
         config = cf;
+        receiverLatLon = ll;
         buf = bd;
-        db = (Database) null;
-        EOF = false;
 
+        radarid = cf.getRadarID();
+        radarscan = (long) cf.getRadarScanTime() * 1000L;
+        acid = "";
+        EOF = false;        
+
+        String connectionURL = config.getDatabaseURL();
+
+        Properties properties = new Properties();
+        properties.setProperty("user", config.getDatabaseLogin());
+        properties.setProperty("password", config.getDatabasePassword());
+        properties.setProperty("useSSL", "false");
+        properties.setProperty("allowPublicKeyRetrieval", "true");
+        properties.setProperty("serverTimezone", "UTC");
+
+        /*
+         * You need the ODBC MySQL driver library in the same directory you have
+         * the executable JAR file of this program, but under a lib directory.
+         */
+        try {
+            db1 = DriverManager.getConnection(connectionURL, properties);
+        } catch (SQLException e2) {
+            System.err.println("DataBlockParser Fatal: Unable to open database 1 " + connectionURL + " " + e2.getLocalizedMessage());
+            System.exit(0);
+        }
+
+        try {
+            db2 = DriverManager.getConnection(connectionURL, properties);
+        } catch (SQLException e3) {
+            System.err.println("DataBlockParser Fatal: Unable to open database 2" + connectionURL + " " + e3.getLocalizedMessage());
+            System.exit(0);
+        }
+        
         targets = new ConcurrentHashMap<>();
 
-        timeout = config.getDatabaseTargetTimeout() * 60L * 1000L;
-        receiverLatLon = ll;
         pm = new PositionManager(receiverLatLon, this);
         nconverter = new NConverter();
+
+        targetTimeout = config.getDatabaseTargetTimeout() * 60L * 1000L;
+        targetTimeoutTask = new TargetTimeoutThread();
+
+        targetTimer = new Timer();
+        targetTimer.scheduleAtFixedRate(targetTimeoutTask, 0L, RATE1); // Update targets every 30 seconds
 
         task1 = new UpdateReports();
         timer1 = new Timer();
@@ -93,7 +141,7 @@ public final class DataBlockParser extends Thread {
         task2 = new UpdateTrackQuality();
         timer2 = new Timer();
         timer2.scheduleAtFixedRate(task2, 10L, RATE2);
-        
+
         process = new Thread(this);
         process.setName("DataBlockParser");
         process.setPriority(Thread.NORM_PRIORITY);
@@ -106,21 +154,83 @@ public final class DataBlockParser extends Thread {
 
     public void close() {
         EOF = true;
+        
+        try {
+            db1.close();
+            db2.close();
+        } catch (SQLException e) {
+            System.out.println("DataBlockParser::close Closing Bug " + e.getMessage());
+            System.exit(0);
+        }
+
         timer1.cancel();
         timer2.cancel();
 
         pm.close();
     }
 
-    public void setDatabase(Database val) {
-        db = val;
+    /**
+     * TargetTimeoutThread
+     *
+     * A TimerTask class to move target to history after fade-out,
+     */
+    private class TargetTimeoutThread extends TimerTask {
+
+        private long time;
+        private long timeout;
+
+        @Override
+        public void run() {
+            String update;
+
+            time = zulu.getUTCTime();
+            timeout = time - targetTimeout;    // timeout in minutes
+
+            /*
+             * This also converts the timestamp to SQL format, as the history is
+             * probably not going to need any further computations.
+             */
+            update = String.format(
+                    "INSERT INTO targethistory (flight_id,radar_id,acid,utcdetect,utcfadeout,altitude,groundSpeed,"
+                    + "groundTrack,gsComputed,gtComputed,callsign,latitude,longitude,verticalRate,verticalTrend,squawk,alert,emergency,spi,onground,"
+                    + "hijack,comm_out,hadAlert,hadEmergency,hadSPI) SELECT flight_id,radar_id,acid,FROM_UNIXTIME(utcdetect/1000),FROM_UNIXTIME(utcupdate/1000),"
+                    + "altitude,groundSpeed,groundTrack,gsComputed,gtComputed,callsign,latitude,longitude,verticalRate,verticalTrend,squawk,alert,"
+                    + "emergency,spi,onground,hijack,comm_out,hadAlert,hadEmergency,hadSPI FROM target WHERE target.utcupdate <= %d",
+                    timeout);
+
+            try {
+                querytt = db2.createStatement();
+                querytt.executeUpdate(update);
+                querytt.close();
+            } catch (SQLException tt1) {
+                try {
+                    querytt.close();
+                } catch (SQLException tt2) {
+                }
+                System.out.println("TargetTimeoutThread::run targethistory SQL Error: " + update + " " + tt1.getMessage());
+            }
+
+            update = String.format("DELETE FROM target WHERE utcupdate <= %d", timeout);
+
+            try {
+                querytt = db2.createStatement();
+                querytt.executeUpdate(update);
+                querytt.close();
+            } catch (SQLException tt3) {
+                try {
+                    querytt.close();
+                } catch (SQLException tt4) {
+                }
+                System.out.println("DataBlockParser::TargetTimeoutThread delete SQL Error: " + update + " " + tt3.getMessage());
+            }
+        }
     }
 
     public synchronized boolean hasTarget(String acid) throws NullPointerException {
         try {
             return targets.containsKey(acid);
         } catch (NullPointerException e) {
-            throw new NullPointerException("ProcessTargets::hasTarget Exception during containsKey " + e.getMessage());
+            throw new NullPointerException("DataBlockParser::hasTarget Exception during containsKey " + e.getMessage());
         }
     }
 
@@ -132,7 +242,7 @@ public final class DataBlockParser extends Thread {
         try {
             return targets.get(acid);
         } catch (NullPointerException e) {
-            throw new NullPointerException("ProcessTargets::getTarget Exception during get " + e.getMessage());
+            throw new NullPointerException("DataBlockParser::getTarget Exception during get " + e.getMessage());
         }
     }
 
@@ -152,7 +262,7 @@ public final class DataBlockParser extends Thread {
 
             return result;
         } catch (Exception e) {
-            throw new Exception("ProcessTargets::getAllTargets Exception during add " + e.getMessage());
+            throw new Exception("DataBlockParser::getAllTargets Exception during add " + e.getMessage());
         }
     }
 
@@ -179,13 +289,13 @@ public final class DataBlockParser extends Thread {
 
             return result;
         } catch (Exception e) {
-            throw new Exception("ProcessTargets::getAllUpdatedTargets Exception during add " + e.getMessage());
+            throw new Exception("DataBlockParser::getAllUpdatedTargets Exception during add " + e.getMessage());
         }
     }
 
     /**
-     * After the Target object is created by DataBlockParser, we come here and put the
-     * target on the queue. This is also used to overwrite a target.
+     * After the Target object is created by DataBlockParser, we come here and
+     * put the target on the queue. This is also used to overwrite a target.
      *
      * @param acid a String representing the Aircraft ID
      * @param obj an Object representing the Target data
@@ -194,7 +304,7 @@ public final class DataBlockParser extends Thread {
         try {
             targets.put(acid, obj);
         } catch (NullPointerException e) {
-            throw new NullPointerException("ProcessTargets::addTarget Exception during put " + e.getMessage());
+            throw new NullPointerException("DataBlockParser::addTarget Exception during put " + e.getMessage());
         }
     }
 
@@ -204,7 +314,7 @@ public final class DataBlockParser extends Thread {
                 targets.remove(acid);
             }
         } catch (NullPointerException e) {
-            throw new NullPointerException("ProcessTargets::removeTarget Exception " + e.getMessage());
+            throw new NullPointerException("DataBlockParser::removeTarget Exception " + e.getMessage());
         }
     }
 
@@ -237,7 +347,7 @@ public final class DataBlockParser extends Thread {
                         // find the reports that haven't been updated in X minutes
                         delta = Math.abs(currentTime - id.getUpdatedTime());
 
-                        if (delta >= timeout) {
+                        if (delta >= targetTimeout) {
                             removeTarget(id.getAircraftID());
                         }
                     }
@@ -271,13 +381,13 @@ public final class DataBlockParser extends Thread {
             currentTime = zulu.getUTCTime();
             delta = 0L;
             String acid;
-            
+
             try {
                 targets = getAllTargets();
             } catch (Exception te) {
                 return; // No targets found
             }
-            
+
             for (Track id : targets) {
                 try {
                     if ((id != (Track) null) && (id.getTrackQuality() > 0)) {
@@ -528,6 +638,11 @@ public final class DataBlockParser extends Thread {
      */
     @Override
     public void run() {
+        ResultSet rs = null;
+        String queryString;
+        int ground, exists;
+        long time;
+
         while (EOF == false) {
             while (buf.getQueueSize() > 0) {
                 dbk = buf.popData();
@@ -624,7 +739,7 @@ public final class DataBlockParser extends Thread {
                                      * New Target
                                      */
                                     Track t = new Track(acid, false);  // false == not TIS
-                                    
+
                                     t.setRegistration(nconverter.icao_to_n(acid));
                                     addTarget(acid, t);
                                 }
@@ -688,7 +803,7 @@ public final class DataBlockParser extends Thread {
                                      * New Target
                                      */
                                     Track t = new Track(acid, false);  // false == not TIS
-                                    
+
                                     t.setRegistration(nconverter.icao_to_n(acid));
                                     addTarget(acid, t);
                                 }
@@ -797,7 +912,7 @@ public final class DataBlockParser extends Thread {
                                      * New Target
                                      */
                                     Track t = new Track(acid, true);  // true == TIS
-                                    
+
                                     t.setRegistration(nconverter.icao_to_n(acid));
                                     addTarget(acid, t);
                                 }
@@ -973,16 +1088,320 @@ public final class DataBlockParser extends Thread {
                 }
             } // while (buf.getQueueSize() > 0)
 
-            /*
-             * Now update the database
-             */
-            if (db != null) {
-                db.updateDatabase();
+            try {
+                List<Track> table = getAllUpdatedTargets();
+
+                if (table.isEmpty() == false) {
+                    for (Track trk : table) {
+                        time = trk.getUpdatedTime();
+                        trk.setUpdated(false);
+
+                        acid = trk.getAircraftID();
+
+                        /*
+                         * See if this ACID exists yet in the target table, and
+                         * has our radar ID. If it does, we can do an update, and
+                         * if not we will do an insert.
+                         */
+                        try {
+                            queryString = String.format("SELECT count(1) AS TC FROM target WHERE acid='%s' AND radar_id=%d",
+                                    acid, radarid);
+
+                            query = db1.createStatement();
+                            rs = query.executeQuery(queryString);
+
+                            if (rs.next() == true) {
+                                exists = rs.getInt("TC");
+                            } else {
+                                exists = 0;
+                            }
+
+                            rs.close();
+                            query.close();
+                        } catch (SQLException e3) {
+                            try {
+                                if (rs != null) {
+                                    rs.close();
+                                }
+                            } catch (SQLException e4) {
+                            }
+                            query.close();
+                            continue;   // this is not good, so end pass
+                        }
+
+                        if ((trk.getOnGround() == true) || (trk.getVirtualOnGround() == true)) {
+                            ground = 1;
+                        } else {
+                            ground = 0;
+                        }
+
+                        if (exists > 0) {         // target exists
+                            queryString = String.format("UPDATE target SET utcupdate=%d,"
+                                    + "altitude=NULLIF(%d, -9999),"
+                                    + "groundSpeed=NULLIF(%.1f, -999.0),"
+                                    + "groundTrack=NULLIF(%.1f, -999.0),"
+                                    + "gsComputed=NULLIF(%.1f, -999.0),"
+                                    + "gtComputed=NULLIF(%.1f, -999.0),"
+                                    + "callsign='%s',"
+                                    + "latitude=NULLIF(%f, -999.0),"
+                                    + "longitude=NULLIF(%f, -999.0),"
+                                    + "verticalRate=NULLIF(%d, -9999),"
+                                    + "verticalTrend=%d,"
+                                    + "quality=%d,"
+                                    + "squawk='%s',"
+                                    + "alert=%d,"
+                                    + "emergency=%d,"
+                                    + "spi=%d,"
+                                    + "onground=%d,"
+                                    + "hijack=%d,"
+                                    + "comm_out=%d,"
+                                    + "hadAlert=%d,"
+                                    + "hadEmergency=%d,"
+                                    + "hadSPI=%d"
+                                    + " WHERE acid='%s' AND radar_id=%d",
+                                    time,
+                                    trk.getAltitude(),
+                                    trk.getGroundSpeed(),
+                                    trk.getGroundTrack(),
+                                    trk.getComputedGroundSpeed(),
+                                    trk.getComputedGroundTrack(),
+                                    trk.getCallsign(),
+                                    trk.getLatitude(),
+                                    trk.getLongitude(),
+                                    trk.getVerticalRate(),
+                                    trk.getVerticalTrend(),
+                                    trk.getTrackQuality(),
+                                    trk.getSquawk(),
+                                    trk.getAlert() ? 1 : 0,
+                                    trk.getEmergency() ? 1 : 0,
+                                    trk.getSPI() ? 1 : 0,
+                                    ground,
+                                    trk.getHijack() ? 1 : 0,
+                                    trk.getCommOut() ? 1 : 0,
+                                    trk.getHadAlert() ? 1 : 0,
+                                    trk.getHadEmergency() ? 1 : 0,
+                                    trk.getHadSPI() ? 1 : 0,
+                                    acid,
+                                    radarid);
+                        } else {                // target doesn't exist
+                            queryString = String.format("INSERT INTO target ("
+                                    + "acid,"
+                                    + "radar_id,"
+                                    + "utcdetect,"
+                                    + "utcupdate,"
+                                    + "altitude,"
+                                    + "groundSpeed,"
+                                    + "groundTrack,"
+                                    + "gsComputed,"
+                                    + "gtComputed,"
+                                    + "callsign,"
+                                    + "latitude,"
+                                    + "longitude,"
+                                    + "verticalRate,"
+                                    + "verticalTrend,"
+                                    + "quality,"
+                                    + "squawk,"
+                                    + "alert,"
+                                    + "emergency,"
+                                    + "spi,"
+                                    + "onground,"
+                                    + "hijack,"
+                                    + "comm_out,"
+                                    + "hadAlert,"
+                                    + "hadEmergency,"
+                                    + "hadSPI) "
+                                    + "VALUES ('%s',%d,%d,%d,"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%.1f,-999.0),"
+                                    + "NULLIF(%.1f,-999.0),"
+                                    + "NULLIF(%.1f,-999.0),"
+                                    + "NULLIF(%.1f,-999.0),"
+                                    + "'%s',"
+                                    + "NULLIF(%f, -999.0),"
+                                    + "NULLIF(%f, -999.0),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "'%s',"
+                                    + "%d,%d,%d,%d,%d,%d,%d,%d,%d)",
+                                    acid,
+                                    radarid,
+                                    time,
+                                    time,
+                                    trk.getAltitude(),
+                                    trk.getGroundSpeed(),
+                                    trk.getGroundTrack(),
+                                    trk.getComputedGroundSpeed(),
+                                    trk.getComputedGroundTrack(),
+                                    trk.getCallsign(),
+                                    trk.getLatitude(),
+                                    trk.getLongitude(),
+                                    trk.getVerticalRate(),
+                                    trk.getVerticalTrend(),
+                                    trk.getTrackQuality(),
+                                    trk.getSquawk(),
+                                    trk.getAlert() ? 1 : 0,
+                                    trk.getEmergency() ? 1 : 0,
+                                    trk.getSPI() ? 1 : 0,
+                                    ground,
+                                    trk.getHijack() ? 1 : 0,
+                                    trk.getCommOut() ? 1 : 0,
+                                    trk.getHadAlert() ? 1 : 0,
+                                    trk.getHadEmergency() ? 1 : 0,
+                                    trk.getHadSPI() ? 1 : 0);
+                        }
+
+                        try {
+                            query = db1.createStatement();
+                            query.executeUpdate(queryString);
+                            query.close();
+                        } catch (SQLException e5) {
+                            query.close();
+                            System.out.println("DataBlockParser::run query target Error: " + queryString + " " + e5.getMessage());
+                        }
+
+                        if (trk.getUpdatePosition() == true) {
+                            trk.setUpdatePosition(false);
+
+                            // Safety check, we don't want NULL's
+                            // TODO: Figure out why we get those
+                            if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
+                                queryString = String.format("INSERT INTO targetecho ("
+                                        + "flight_id,"
+                                        + "radar_id,"
+                                        + "acid,"
+                                        + "utcdetect,"
+                                        + "latitude,"
+                                        + "longitude,"
+                                        + "altitude,"
+                                        + "verticalTrend,"
+                                        + "onground"
+                                        + ") VALUES ("
+                                        + "(SELECT flight_id FROM target WHERE acid='%s' AND radar_id=%d),"
+                                        + "%d,"
+                                        + "'%s',"
+                                        + "%d,"
+                                        + "%f,"
+                                        + "%f,"
+                                        + "NULLIF(%d, -9999),"
+                                        + "%d,"
+                                        + "%d)",
+                                        acid,
+                                        radarid,
+                                        radarid,
+                                        acid,
+                                        time,
+                                        trk.getLatitude(),
+                                        trk.getLongitude(),
+                                        trk.getAltitude(),
+                                        trk.getVerticalTrend(),
+                                        ground);
+
+                                try {
+                                    query = db1.createStatement();
+                                    query.executeUpdate(queryString);
+                                    query.close();
+                                } catch (SQLException e6) {
+                                    query.close();
+                                    System.out.println("DataBlockParser::run query targetecho Error: " + queryString + " " + e6.getMessage());
+                                }
+                            }
+                        }
+
+                        if (trk.getRegistration().equals("") == false) {
+                            try {
+
+                                queryString = String.format("SELECT count(1) AS RG FROM modestable"
+                                        + " WHERE acid='%s'", acid);
+
+                                query = db1.createStatement();
+                                rs = query.executeQuery(queryString);
+
+                                if (rs.next() == true) {
+                                    exists = rs.getInt("RG");
+                                } else {
+                                    exists = 0;
+                                }
+
+                                rs.close();
+                                query.close();
+                            } catch (SQLException e7) {
+                                rs.close();
+                                query.close();
+                                System.out.println("DataBlockParser::run query modestable warn: " + queryString + " " + e7.getMessage());
+                                continue;   // skip the following
+                            }
+
+                            if (exists > 0) {
+                                queryString = String.format("UPDATE modestable SET acft_reg='%s',utcupdate=%d WHERE acid='%s'",
+                                        trk.getRegistration(),
+                                        time,
+                                        acid);
+
+                                query = db1.createStatement();
+                                query.executeUpdate(queryString);
+                                query.close();
+                            }
+                        }
+
+                        if (trk.getCallsign().equals("") == false) {
+                            try {
+
+                                queryString = String.format("SELECT count(1) AS CS FROM callsign"
+                                        + " WHERE callsign='%s' AND acid='%s' AND radar_id=%d",
+                                        trk.getCallsign(), acid, radarid);
+
+                                query = db1.createStatement();
+                                rs = query.executeQuery(queryString);
+
+                                if (rs.next() == true) {
+                                    exists = rs.getInt("CS");
+                                } else {
+                                    exists = 0;
+                                }
+
+                                rs.close();
+                                query.close();
+                            } catch (SQLException e8) {
+                                rs.close();
+                                query.close();
+                                System.out.println("DataBlockParser::run query callsign warn: " + queryString + " " + e8.getMessage());
+                                continue;   // skip the following
+                            }
+
+                            if (exists > 0) {
+                                queryString = String.format("UPDATE callsign SET utcupdate=%d WHERE callsign='%s' AND acid='%s' AND radar_id=%d",
+                                        time, trk.getCallsign(), acid, radarid);
+                            } else {
+                                queryString = String.format("INSERT INTO callsign (callsign,flight_id,radar_id,acid,"
+                                        + "utcdetect,utcupdate) VALUES ('%s',"
+                                        + "(SELECT flight_id FROM target WHERE acid='%s' AND radar_id=%d),"
+                                        + "%d,'%s',%d,%d)",
+                                        trk.getCallsign(),
+                                        acid,
+                                        radarid,
+                                        radarid,
+                                        acid,
+                                        time,
+                                        time);
+                            }
+
+                            query = db1.createStatement();
+                            query.executeUpdate(queryString);
+                            query.close();
+                        }
+                    }
+                } // table empty
+            } catch (Exception g1) {
+                // No targets updated
             }
 
+            /*
+             * Simulate radar RPM
+             */
             try {
-                sleep(0, 100);
-            } catch (InterruptedException z) {
+                Thread.sleep(radarscan);
+            } catch (InterruptedException e9) {
             }
         }
     }
