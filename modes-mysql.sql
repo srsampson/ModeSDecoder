@@ -4,7 +4,7 @@ USE `modes`;
 --
 -- Host: localhost    Database: modes
 -- ------------------------------------------------------
--- Server version	8.4.1
+-- Server version	9.0.0
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -36,7 +36,7 @@ CREATE TABLE `callsign` (
   UNIQUE KEY `Index_Callsign` (`acid`,`callsign`,`flight_id`,`radar_id`),
   KEY `FK_callsign_acid` (`acid`),
   CONSTRAINT `FK_callsign_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsigns Associated with Targets';
+) ENGINE=InnoDB AUTO_INCREMENT=73 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsigns Associated with Targets';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -74,6 +74,14 @@ CREATE TABLE `target` (
   `utcdetect` bigint NOT NULL COMMENT 'UTC Time track detected',
   `utcupdate` bigint NOT NULL COMMENT 'UTC Time track updated',
   `altitude` int DEFAULT NULL COMMENT 'Altitude in feet',
+  `altitudedf00` int DEFAULT NULL,
+  `altitudedf04` int DEFAULT NULL,
+  `altitudedf16` int DEFAULT NULL,
+  `altitudedf17` int DEFAULT NULL,
+  `altitudedf18` int DEFAULT NULL,
+  `altitudedf20` int DEFAULT NULL,
+  `radariid` int DEFAULT NULL,
+  `si` tinyint(1) NOT NULL DEFAULT '0',
   `groundSpeed` double DEFAULT NULL COMMENT 'Speed over the ground',
   `groundTrack` double DEFAULT NULL COMMENT 'Heading in relation to True North',
   `gsComputed` double DEFAULT NULL COMMENT 'Computed Speed over the ground',
@@ -98,7 +106,7 @@ CREATE TABLE `target` (
   UNIQUE KEY `FltIDIndex` (`flight_id`,`acid`,`radar_id`) USING BTREE,
   KEY `FK_acid` (`acid`),
   CONSTRAINT `FK_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Active Target Tracks';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Active Target Tracks';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -153,6 +161,8 @@ CREATE TABLE `targetecho` (
   `radar_id` int unsigned NOT NULL DEFAULT '0' COMMENT 'Radar ID that generated this target report',
   `acid` char(6) NOT NULL COMMENT 'Aircraft ID',
   `utcdetect` bigint NOT NULL COMMENT 'UTC Time detected',
+  `radariid` int DEFAULT NULL,
+  `si` tinyint(1) NOT NULL DEFAULT '0',
   `latitude` double NOT NULL COMMENT 'latitude in degrees',
   `longitude` double NOT NULL COMMENT 'longitude in degrees',
   `altitude` int DEFAULT NULL COMMENT 'Reported Altitude in Feet',
@@ -161,7 +171,7 @@ CREATE TABLE `targetecho` (
   PRIMARY KEY (`record_num`),
   KEY `FK_targetecho_acid` (`acid`),
   CONSTRAINT `FK_targetecho_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='History of Target Positions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='History of Target Positions';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -176,8 +186,8 @@ CREATE TABLE `targethistory` (
   `flight_id` bigint unsigned NOT NULL DEFAULT '0',
   `radar_id` int unsigned NOT NULL DEFAULT '0',
   `acid` char(6) NOT NULL,
-  `utcdetect` TIMESTAMP NULL DEFAULT NULL COMMENT 'UTC Time detected',
-  `utcfadeout` TIMESTAMP NULL DEFAULT NULL COMMENT 'UTC Fadeout Time',
+  `utcdetect` timestamp NULL DEFAULT NULL COMMENT 'UTC Time detected',
+  `utcfadeout` timestamp NULL DEFAULT NULL COMMENT 'UTC Fadeout Time',
   `altitude` int DEFAULT NULL,
   `groundSpeed` double DEFAULT NULL,
   `groundTrack` double DEFAULT NULL,
@@ -202,7 +212,7 @@ CREATE TABLE `targethistory` (
   UNIQUE KEY `FltIDIndex` (`flight_id`,`acid`,`radar_id`) USING BTREE,
   KEY `FK_targethistory_acid` (`acid`),
   CONSTRAINT `FK_targethistory_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Targets No Longer Active';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Targets No Longer Active';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -222,4 +232,4 @@ CREATE TABLE `targethistory` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-09 10:18:49
+-- Dump completed on 2024-07-17 13:09:42

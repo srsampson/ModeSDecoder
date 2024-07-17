@@ -430,7 +430,7 @@ public final class LatLon {
      * @param txt a string containing a latitude or longitude
      * @return the latitude or longitude as a double in degrees
      */
-    public double fromString(String txt) {
+    public double fromString(String txt) throws NumberFormatException {
         int txtlen = txt.length();
         int idx = 0;
 
@@ -500,8 +500,6 @@ public final class LatLon {
             }
         }
 
-        double num = sgn * (numd + (numm / 60.0) + ((nums + (numss / 10)) / 3600.0));
-
-        return num;
+        return sgn * (numd + (numm / 60.0) + ((nums + (numss / 10)) / 3600.0));
     }
 }

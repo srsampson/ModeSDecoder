@@ -226,23 +226,15 @@ public final class DataBlockParser extends Thread {
         }
     }
 
-    public synchronized boolean hasTarget(String acid) throws NullPointerException {
-        try {
+    public boolean hasTarget(String acid) throws NullPointerException {
+        synchronized (targets) {
             return targets.containsKey(acid);
-        } catch (NullPointerException e) {
-            throw new NullPointerException("DataBlockParser::hasTarget Exception during containsKey " + e.getMessage());
         }
     }
 
-    public synchronized int getQueueSize() {
-        return targets.size();
-    }
-
-    public synchronized Track getTarget(String acid) throws NullPointerException {
-        try {
+    public Track getTarget(String acid) throws NullPointerException {
+        synchronized (targets) {
             return targets.get(acid);
-        } catch (NullPointerException e) {
-            throw new NullPointerException("DataBlockParser::getTarget Exception during get " + e.getMessage());
         }
     }
 
@@ -250,72 +242,56 @@ public final class DataBlockParser extends Thread {
      * Method to return a collection of all targets.
      *
      * @return a vector Representing all target objects.
-     * @throws java.lang.Exception
      */
-    public synchronized List<Track> getAllTargets() throws Exception {
+    public List<Track> getAllTargets() throws NullPointerException {
         List<Track> result = new ArrayList<>();
 
-        try {
-            targets.values().stream().forEach((obj) -> {
-                result.add(obj);
-            });
-
-            return result;
-        } catch (Exception e) {
-            throw new Exception("DataBlockParser::getAllTargets Exception during add " + e.getMessage());
+        synchronized (targets) {
+            result.addAll(targets.values());
         }
+        
+        return result;
     }
 
     /**
-     * Find all the updated targets, and reset them to not updated for the next
-     * pass
+     * Method to return a collection of all updated targets.
      *
      * @return a vector representing all the targets that have been updated
-     * @throws java.lang.Exception
      */
-    public synchronized List<Track> getAllUpdatedTargets() throws Exception {
+    public List<Track> getAllUpdatedTargets() throws NullPointerException {
         List<Track> result = new ArrayList<>();
+        
+        List<Track> targetlist = getAllTargets();
 
-        try {
-            targets.values().stream().forEach((tgt) -> {
+        if (targetlist.isEmpty() == false) {
+            for (Track tgt : targetlist) {
                 if (tgt.getUpdated() == true) {
-                    tgt.setUpdated(false);
-                    tgt.setUpdatedTime(zulu.getUTCTime());
-
-                    targets.put(tgt.getAircraftID(), tgt);     // overwrites original target
                     result.add(tgt);
                 }
-            });
-
-            return result;
-        } catch (Exception e) {
-            throw new Exception("DataBlockParser::getAllUpdatedTargets Exception during add " + e.getMessage());
+            }
         }
+        
+        return result;
     }
 
     /**
-     * After the Target object is created by DataBlockParser, we come here and
-     * put the target on the queue. This is also used to overwrite a target.
+     * Put target on queue after being created or updated
      *
      * @param acid a String representing the Aircraft ID
      * @param obj an Object representing the Target data
      */
-    public synchronized void addTarget(String acid, Track obj) throws NullPointerException {
-        try {
-            targets.put(acid, obj);
-        } catch (NullPointerException e) {
-            throw new NullPointerException("DataBlockParser::addTarget Exception during put " + e.getMessage());
-        }
+    public void addTarget(String acid, Track obj) throws NullPointerException {
+       synchronized (targets) {
+           targets.put(acid, obj);
+       }
     }
 
-    public synchronized void removeTarget(String acid) throws NullPointerException {
-        try {
+    public void removeTarget(String acid) throws NullPointerException {
+       synchronized (targets) {
             if (targets.containsKey(acid) == true) {
                 targets.remove(acid);
             }
-        } catch (NullPointerException e) {
-            throw new NullPointerException("DataBlockParser::removeTarget Exception " + e.getMessage());
-        }
+       }
     }
 
     /*
@@ -335,7 +311,7 @@ public final class DataBlockParser extends Thread {
 
             try {
                 targets = getAllTargets();
-            } catch (Exception te) {
+            } catch (NullPointerException te) {
                 return; // No targets found
             }
 
@@ -384,13 +360,13 @@ public final class DataBlockParser extends Thread {
 
             try {
                 targets = getAllTargets();
-            } catch (Exception te) {
+            } catch (NullPointerException te) {
                 return; // No targets found
             }
 
             for (Track id : targets) {
                 try {
-                    if ((id != (Track) null) && (id.getTrackQuality() > 0)) {
+                    if (id.getTrackQuality() > 0) {
                         acid = id.getAircraftID();
 
                         // find the idStatus reports that haven't been position updated in 30 seconds
@@ -403,21 +379,9 @@ public final class DataBlockParser extends Thread {
                         }
                     }
                 } catch (NullPointerException e1) {
-                    System.err.println("DataBlockParser::updateTrackQuality Exception during iteration " + e1.getMessage());
+                    // not likely
                 }
             }
-        }
-    }
-
-    public int getTargetQueueSize() {
-        return getQueueSize();
-    }
-
-    public List<Track> getTargets() throws Exception {
-        try {
-            return getAllUpdatedTargets();
-        } catch (Exception e) {
-            throw new Exception(e);
         }
     }
 
@@ -1137,7 +1101,15 @@ public final class DataBlockParser extends Thread {
 
                         if (exists > 0) {         // target exists
                             queryString = String.format("UPDATE target SET utcupdate=%d,"
+                                    + "radariid=NULLIF(%d, -99),"
+                                    + "si=%d,"
                                     + "altitude=NULLIF(%d, -9999),"
+                                    + "altitudedf00=NULLIF(%d, -9999),"
+                                    + "altitudedf04=NULLIF(%d, -9999),"                                    
+                                    + "altitudedf16=NULLIF(%d, -9999),"                                    
+                                    + "altitudedf17=NULLIF(%d, -9999),"                                    
+                                    + "altitudedf18=NULLIF(%d, -9999),"                                    
+                                    + "altitudedf20=NULLIF(%d, -9999),"                                    
                                     + "groundSpeed=NULLIF(%.1f, -999.0),"
                                     + "groundTrack=NULLIF(%.1f, -999.0),"
                                     + "gsComputed=NULLIF(%.1f, -999.0),"
@@ -1160,7 +1132,15 @@ public final class DataBlockParser extends Thread {
                                     + "hadSPI=%d"
                                     + " WHERE acid='%s' AND radar_id=%d",
                                     time,
+                                    trk.getRadarIID(),
+                                    trk.getSI() ? 1 : 0,
                                     trk.getAltitude(),
+                                    trk.getAltitudeDF00(),
+                                    trk.getAltitudeDF04(),
+                                    trk.getAltitudeDF16(),
+                                    trk.getAltitudeDF17(),
+                                    trk.getAltitudeDF18(),
+                                    trk.getAltitudeDF20(),
                                     trk.getGroundSpeed(),
                                     trk.getGroundTrack(),
                                     trk.getComputedGroundSpeed(),
@@ -1189,7 +1169,15 @@ public final class DataBlockParser extends Thread {
                                     + "radar_id,"
                                     + "utcdetect,"
                                     + "utcupdate,"
+                                    + "radariid,"
+                                    + "si,"
                                     + "altitude,"
+                                    + "altitudedf00,"
+                                    + "altitudedf04,"                                    
+                                    + "altitudedf16,"                                    
+                                    + "altitudedf17,"                                    
+                                    + "altitudedf18,"                                    
+                                    + "altitudedf20,"
                                     + "groundSpeed,"
                                     + "groundTrack,"
                                     + "gsComputed,"
@@ -1211,6 +1199,13 @@ public final class DataBlockParser extends Thread {
                                     + "hadEmergency,"
                                     + "hadSPI) "
                                     + "VALUES ('%s',%d,%d,%d,"
+                                    + "NULLIF(%d, -99), %d,"    // radarIID & SI
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
                                     + "NULLIF(%d, -9999),"
                                     + "NULLIF(%.1f,-999.0),"
                                     + "NULLIF(%.1f,-999.0),"
@@ -1228,18 +1223,29 @@ public final class DataBlockParser extends Thread {
                                     radarid,
                                     time,
                                     time,
+                                    trk.getRadarIID(),
+                                    trk.getSI() ? 1 : 0,
                                     trk.getAltitude(),
+                                    trk.getAltitudeDF00(),
+                                    trk.getAltitudeDF04(),
+                                    trk.getAltitudeDF16(),
+                                    trk.getAltitudeDF17(),
+                                    trk.getAltitudeDF18(),
+                                    trk.getAltitudeDF20(),
                                     trk.getGroundSpeed(),
                                     trk.getGroundTrack(),
                                     trk.getComputedGroundSpeed(),
                                     trk.getComputedGroundTrack(),
+                                    
                                     trk.getCallsign(),
                                     trk.getLatitude(),
                                     trk.getLongitude(),
+                                    
                                     trk.getVerticalRate(),
                                     trk.getVerticalTrend(),
                                     trk.getTrackQuality(),
                                     trk.getSquawk(),
+                                    
                                     trk.getAlert() ? 1 : 0,
                                     trk.getEmergency() ? 1 : 0,
                                     trk.getSPI() ? 1 : 0,
@@ -1271,6 +1277,8 @@ public final class DataBlockParser extends Thread {
                                         + "radar_id,"
                                         + "acid,"
                                         + "utcdetect,"
+                                        + "radariid,"
+                                        + "si,"
                                         + "latitude,"
                                         + "longitude,"
                                         + "altitude,"
@@ -1281,6 +1289,7 @@ public final class DataBlockParser extends Thread {
                                         + "%d,"
                                         + "'%s',"
                                         + "%d,"
+                                        + "NULLIF(%d, -99), %d," // radariid & si
                                         + "%f,"
                                         + "%f,"
                                         + "NULLIF(%d, -9999),"
@@ -1291,6 +1300,8 @@ public final class DataBlockParser extends Thread {
                                         radarid,
                                         acid,
                                         time,
+                                        trk.getRadarIID(),
+                                        trk.getSI() ? 1 : 0,
                                         trk.getLatitude(),
                                         trk.getLongitude(),
                                         trk.getAltitude(),
@@ -1392,7 +1403,7 @@ public final class DataBlockParser extends Thread {
                         }
                     }
                 } // table empty
-            } catch (Exception g1) {
+            } catch (NullPointerException | SQLException g1) {
                 // No targets updated
             }
 

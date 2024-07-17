@@ -91,6 +91,7 @@ public final class Track implements IConstants {
         longitude = -999.0;
         ias = -999.0;
         tas = -999.0;
+        radarIID = -99;
         verticalRate = -9999;
         verticalTrend = 0;
         altitudeDF00 = -9999;
@@ -433,6 +434,10 @@ public final class Track implements IConstants {
         }
     }
 
+    public int getAltitudeDF00() {
+        return altitudeDF00;
+    }
+
     /**
      * Method used to set the DF04 altitude in feet MSL (29.92) The virtual
      * onground status is also set if altitude reads 0 feet.
@@ -447,6 +452,10 @@ public final class Track implements IConstants {
         }
     }
 
+    public int getAltitudeDF04() {
+        return altitudeDF04;
+    }
+    
     /**
      * Method used to set the DF16 altitude in feet MSL (29.92) The virtual
      * onground status is also set if altitude reads 0 feet.
@@ -461,6 +470,10 @@ public final class Track implements IConstants {
         }
     }
 
+    public int getAltitudeDF16() {
+        return altitudeDF16;
+    }
+    
     /**
      * Method used to set the DF17 altitude in feet MSL (29.92) The virtual
      * onground status is also set if altitude reads 0 feet.
@@ -475,6 +488,10 @@ public final class Track implements IConstants {
         }
     }
 
+    public int getAltitudeDF17() {
+        return altitudeDF17;
+    }
+    
     /**
      * Method used to set the DF18 altitude in feet MSL (29.92) The virtual
      * onground status is also set if altitude reads 0 feet.
@@ -487,6 +504,10 @@ public final class Track implements IConstants {
             isVirtOnGround = (val == 0);
             updated = true;
         }
+    }
+
+    public int getAltitudeDF18() {
+        return altitudeDF18;
     }
     
     /**
@@ -503,6 +524,10 @@ public final class Track implements IConstants {
         }
     }
 
+    public int getAltitudeDF20() {
+        return altitudeDF20;
+    }
+    
     /**
      * Method used to return the target altitude in feet MSL (29.92)
      *

@@ -69,8 +69,8 @@ public final class DownlinkFormat11 implements IDF11 {
              */
 
             pi7 = Integer.parseInt(crcValue.substring(4), 16);
-            cl3 = (pi7 >>> 4) & 0x07;
             radarIID = pi7 & 0x0F;
+            cl3 = (pi7 >>> 4) & 0x07;
 
             if (cl3 == 0) {
                 isSIcode = false;
