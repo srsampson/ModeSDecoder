@@ -36,7 +36,7 @@ CREATE TABLE `callsign` (
   UNIQUE KEY `Index_Callsign` (`acid`,`callsign`,`flight_id`,`radar_id`),
   KEY `FK_callsign_acid` (`acid`),
   CONSTRAINT `FK_callsign_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=73 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsigns Associated with Targets';
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsigns Associated with Targets';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -106,7 +106,7 @@ CREATE TABLE `target` (
   UNIQUE KEY `FltIDIndex` (`flight_id`,`acid`,`radar_id`) USING BTREE,
   KEY `FK_acid` (`acid`),
   CONSTRAINT `FK_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Active Target Tracks';
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Active Target Tracks';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -171,7 +171,7 @@ CREATE TABLE `targetecho` (
   PRIMARY KEY (`record_num`),
   KEY `FK_targetecho_acid` (`acid`),
   CONSTRAINT `FK_targetecho_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='History of Target Positions';
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='History of Target Positions';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -188,7 +188,15 @@ CREATE TABLE `targethistory` (
   `acid` char(6) NOT NULL,
   `utcdetect` timestamp NULL DEFAULT NULL COMMENT 'UTC Time detected',
   `utcfadeout` timestamp NULL DEFAULT NULL COMMENT 'UTC Fadeout Time',
+  `radariid` int DEFAULT NULL,
+  `si` tinyint(1) NOT NULL DEFAULT '0',
   `altitude` int DEFAULT NULL,
+  `altitudedf00` int DEFAULT NULL,
+  `altitudedf04` int DEFAULT NULL,
+  `altitudedf16` int DEFAULT NULL,
+  `altitudedf17` int DEFAULT NULL,
+  `altitudedf18` int DEFAULT NULL,
+  `altitudedf20` int DEFAULT NULL,
   `groundSpeed` double DEFAULT NULL,
   `groundTrack` double DEFAULT NULL,
   `gsComputed` double DEFAULT NULL,
@@ -212,7 +220,7 @@ CREATE TABLE `targethistory` (
   UNIQUE KEY `FltIDIndex` (`flight_id`,`acid`,`radar_id`) USING BTREE,
   KEY `FK_targethistory_acid` (`acid`),
   CONSTRAINT `FK_targethistory_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Targets No Longer Active';
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Targets No Longer Active';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -232,4 +240,4 @@ CREATE TABLE `targethistory` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-17 13:09:42
+-- Dump completed on 2024-07-17 18:10:28
