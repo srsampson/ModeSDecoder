@@ -324,7 +324,7 @@ public final class Track implements IConstants {
         }
     }
 
-    public synchronized int getVerticalTrend() {
+    public int getVerticalTrend() {
         return verticalTrend;
     }
 
@@ -638,9 +638,9 @@ public final class Track implements IConstants {
      * 
      * @param val a string Representing the target callsign
      */
-    public synchronized void setCallsign(String val) {
-        if (val.equals(callsign) == false) {
-            if (val.equals("") == false) { // keep the old, don't blank
+    public void setCallsign(String val) {
+        if (val.equals("") == false) {
+            if (val.equals(callsign) == false) {
                 callsign = val;
                 updated = true;
             }
@@ -662,14 +662,15 @@ public final class Track implements IConstants {
      * @param val a String Representing the target octal squawk
      */
     public void setSquawk(String val) {
-        if (val.equals(squawk) == false) {
-            if (val.equals("0000") == false) {      // don't switch from a good code to a 0 code            squawk = val;
-                squawk = val;
-                updated = true;
-            
-                emergency = val.equals("7700");
-                hijack = val.equals("7500");
-                comm_out = val.equals("7600");
+        if (val.equals("") == false) {
+            if (val.equals(squawk) == false) {
+                if (val.equals("0000") == false) {      // don't switch from a good to 0 code            squawk = val;
+                    squawk = val;
+                    updated = true;
+                    emergency = val.equals("7700");
+                    hijack = val.equals("7500");
+                    comm_out = val.equals("7600");
+                }
             }
         }
     }
@@ -923,8 +924,10 @@ public final class Track implements IConstants {
      *
      * @return a boolean Representing whether there are TCAS alerts on the queue
      */
-    public synchronized boolean hasTCASAlerts() {
-        return !tcasAlerts.isEmpty();
+    public boolean hasTCASAlerts() {
+        synchronized(tcasAlerts) {
+            return tcasAlerts.isEmpty() == false;
+        }
     }
 
     /**
@@ -932,14 +935,16 @@ public final class Track implements IConstants {
      *
      * @return an integer representing the number of TCAS alerts on the queue
      */
-    public synchronized int getNumberOfTCASAlerts() {
-        return tcasAlerts.size();
+    public int getNumberOfTCASAlerts() {
+        synchronized(tcasAlerts) {
+            return tcasAlerts.size();
+        }
     }
 
     /*
      * Method to add a new TCAS alert for this target at the tail of the queue
      */
-    public synchronized void insertTCAS(long data56, long time) {
+    public void insertTCAS(long data56, long time) {
         TCAS tcas = new TCAS(data56, time, getAltitudeDF16());
 
         /*
@@ -952,10 +957,12 @@ public final class Track implements IConstants {
             return;
         }
 
-        try {
-            tcasAlerts.add(tcas);
-        } catch (UnsupportedOperationException | IllegalArgumentException | ClassCastException | NullPointerException e) {
-            System.err.println("Target::insertTCAS Exception during addElement " + e.toString());
+        synchronized(tcasAlerts) {
+            try {
+                tcasAlerts.add(tcas);
+            } catch (UnsupportedOperationException | IllegalArgumentException | ClassCastException | NullPointerException e) {
+                System.err.println("Target::insertTCAS Exception during addElement " + e.toString());
+            }
         }
     }
 
@@ -964,17 +971,19 @@ public final class Track implements IConstants {
      *
      * @return a vector of TCAS alert objects
      */
-    public synchronized List<TCAS> getTCASAlerts() {
+    public List<TCAS> getTCASAlerts() {
         List<TCAS> result = new ArrayList<>();
 
-        try {
-            for (int i = 0; i < tcasAlerts.size(); i++) {
-                if (tcasAlerts.get(i).getThreatTerminated() == false) {
-                    result.add(tcasAlerts.get(i));
+        synchronized(tcasAlerts) {
+            try {
+                for (int i = 0; i < tcasAlerts.size(); i++) {
+                    if (tcasAlerts.get(i).getThreatTerminated() == false) {
+                        result.add(tcasAlerts.get(i));
+                    }
                 }
+            } catch (Exception e) {
+                System.err.println("Target::getTCASAlerts Exception during addElement " + e.toString());
             }
-        } catch (Exception e) {
-            System.err.println("Target::getTCASAlerts Exception during addElement " + e.toString());
         }
 
         return result;
@@ -985,17 +994,19 @@ public final class Track implements IConstants {
      * 
      * @param t a long representing the current time in milliseconds
      */
-    public synchronized void removeTCAS(long t) {
+    public void removeTCAS(long t) {
         t -= 60000L;         // subtract 60 seconds
-
-        try {
-            for (int i = 0; i < tcasAlerts.size(); i++) {
-                if (tcasAlerts.get(i).getUpdateTime() <= t) {
+        
+        synchronized(tcasAlerts) {
+            try {
+                for (int i = 0; i < tcasAlerts.size(); i++) {
+                    if (tcasAlerts.get(i).getUpdateTime() <= t) {
                         tcasAlerts.remove(i);
+                    }
                 }
+            } catch (Exception e2) {
+                System.err.println("Target::removeTCAS Exception during remove " + e2.toString());
             }
-        } catch (Exception e2) {
-            System.err.println("Target::removeTCAS Exception during remove " + e2.toString());
-        } 
+        }
     }
 }

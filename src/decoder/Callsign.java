@@ -26,10 +26,20 @@ public final class Callsign implements ICallsign {
         char c3 = Alpha[(int) ((data56 >>> 30) & 0x3FL)];
         char c2 = Alpha[(int) ((data56 >>> 36) & 0x3FL)];
         char c1 = Alpha[(int) ((data56 >>> 42) & 0x3FL)];
-
+        
         char[] result = {c1, c2, c3, c4, c5, c6, c7, c8};
-        String callsign = new String(result).trim();
 
-        return callsign;
+        /*
+         * Callsign might be gimped with garbled bits
+         *
+         * Perform a NullPointer check, and punt if thrown
+         */
+        String callsign = new String(result).trim();
+        
+        if (callsign == null) {
+            return "";
+        } else {
+            return callsign;
+        }
     }
 }

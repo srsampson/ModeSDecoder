@@ -142,7 +142,6 @@ public final class DownlinkFormat18 implements IDF18 {
              */
             imf = Integer.parseInt(raw112.substring(9, 10), 16) & 0x01; // ME bit 8
 
-            //if (cf3 == 1 || ((cf3 == 6) && (imf == 1))) {
             if (cf3 == 1) {
                 isOnGround = true;
             }
