@@ -10,7 +10,7 @@ package decoder;
 
 public class CPR implements IConstants {
 
-    private static final double NL[] = new double[59];       // NL[0..58] Number of Longitude Zones
+    private static final float NL[] = new float[59];       // NL[0..58] Number of Longitude Zones
 
     /*
      * Initialize the NL Table (Number of Longitude Zones as a function of
@@ -19,36 +19,36 @@ public class CPR implements IConstants {
      * This has been verified with a published ICAO fixed table.
      */
     public CPR() {
-        double tmp = (1.0 - Math.cos(Math.PI / 30.0));
+        float tmp = (1.0f - (float) Math.cos(Math.PI / 30.0));
 
-        NL[0] = 90.0;
+        NL[0] = 90.0f;
 
         for (int i = 2; i < 60; i++) {
-            NL[i - 1] = Math.toDegrees(Math.acos(Math.sqrt(tmp / (1.0 - Math.cos(TAU / (double) i)))));
+            NL[i - 1] = (float) Math.toDegrees(Math.acos(Math.sqrt(tmp / (1.0 - Math.cos(TAU / (float) i)))));
         }
     }
 
-    public int cprNLFunction(double lat) {
+    public int cprNLFunction(float lat) {
         int i = 58;
 
         lat = Math.abs(lat);
 
-        if (Double.compare(lat, 0.0) == 0) {
+        if (Float.compare(lat, 0.0f) == 0) {
             return 59;                  // Equator
-        } else if (Double.compare(lat, 87.0) == 0) {
+        } else if (Float.compare(lat, 87.0f) == 0) {
             return 2;
-        } else if (Double.compare(lat, 87.0) > 0) {
+        } else if (Float.compare(lat, 87.0f) > 0) {
             return 1;                   // Pole
         }
 
-        while (Double.compare(lat, NL[i]) > 0) {
+        while (Float.compare(lat, NL[i]) > 0) {
             i--;
         }
 
         return (i + 1);     // Java is Arabic - starts at zero...
     }
 
-    private int cprNFunction(double lat, boolean fflag) {
+    private int cprNFunction(float lat, boolean fflag) {
         int nl = cprNLFunction(lat) - ((fflag == ODD) ? 1 : 0);
 
         if (nl < 1) {
@@ -71,76 +71,76 @@ public class CPR implements IConstants {
         return res;
     }
 
-    public double cprModDouble(double a, double b) {
-        if (Double.compare(b, 0.0) == 0) {
-            return Double.NaN;
+    public float cprModFloat(float a, float b) {
+        if (Float.compare(b, 0.0f) == 0) {
+            return Float.NaN;
         }
         
-        double res = Math.IEEEremainder(a, b);
+        float res = (float) Math.IEEEremainder(a, b);
 
-        if (Double.compare(res, 0.0) < 0) {
+        if (Float.compare(res, 0.0f) < 0) {
             res += b;
         }
 
         return res;
     }
 
-    private double cprDlonFunction(double lat, boolean fflag, boolean surface) {
-        return ((surface == true) ? 90.0 : 360.0) / cprNFunction(lat, fflag);
+    private float cprDlonFunction(float lat, boolean fflag, boolean surface) {
+        return ((surface == true) ? 90.0f : 360.0f) / cprNFunction(lat, fflag);
     }
 
     public LatLon decodeCPRairborne(int even_cprlat, int even_cprlon,
             int odd_cprlat, int odd_cprlon, boolean fflag) {
-        double AirDlat0 = 360.0 / 60.0;
-        double AirDlat1 = 360.0 / 59.0;
-        double lat0 = even_cprlat;
-        double lat1 = odd_cprlat;
-        double lon0 = even_cprlon;
-        double lon1 = odd_cprlon;
+        float AirDlat0 = 360.0f / 60.0f;
+        float AirDlat1 = 360.0f / 59.0f;
+        float lat0 = even_cprlat;
+        float lat1 = odd_cprlat;
+        float lon0 = even_cprlon;
+        float lon1 = odd_cprlon;
 
-        double rlat, rlon;
+        float rlat, rlon;
 
         // Compute the Latitude Index "j"
-        int j = (int) Math.floor(((59.0 * lat0 - 60.0 * lat1) / 131072.0) + 0.5);
-        double rlat0 = AirDlat0 * (cprModInt(j, 60) + lat0 / 131072.0);
-        double rlat1 = AirDlat1 * (cprModInt(j, 59) + lat1 / 131072.0);
+        int j = (int) (float) Math.floor(((59.0 * lat0 - 60.0 * lat1) / 131072.0) + 0.5);
+        float rlat0 = AirDlat0 * (cprModInt(j, 60) + lat0 / 131072.0f);
+        float rlat1 = AirDlat1 * (cprModInt(j, 59) + lat1 / 131072.0f);
 
-        if (Double.compare(rlat0, 270.0) >= 0) {
-            rlat0 -= 360.0;
+        if (Float.compare(rlat0, 270.0f) >= 0) {
+            rlat0 -= 360.0f;
         }
 
-        if (Double.compare(rlat1, 270.0) >= 0) {
-            rlat1 -= 360.0;
+        if (Float.compare(rlat1, 270.0f) >= 0) {
+            rlat1 -= 360.0f;
         }
 
         // Check to see that the latitude is in range: -90 .. +90
-        if (Double.compare(rlat0, -90.0) < 0 || Double.compare(rlat0, 90.0) > 0 ||
-                Double.compare(rlat1, -90.0) < 0 || Double.compare(rlat1, 90.0) > 0) {
-            return new LatLon(0.0, 0.0); // bad data
+        if (Float.compare(rlat0, -90.0f) < 0 || Float.compare(rlat0, 90.0f) > 0 ||
+                Float.compare(rlat1, -90.0f) < 0 || Float.compare(rlat1, 90.0f) > 0) {
+            return new LatLon(0.0f, 0.0f); // bad data
         }
         
         // Check that both are in the same latitude zone, or abort.
         if (cprNLFunction(rlat0) != cprNLFunction(rlat1)) {
-            return new LatLon(0.0, 0.0); // positions crossed a latitude zone, try again later
+            return new LatLon(0.0f, 0.0f); // positions crossed a latitude zone, try again later
         }
         
         // Compute ni and the Longitude Index "m"
         if (fflag == ODD) { // Use odd packet.
             int ni = cprNFunction(rlat1, ODD);
-            int m = (int) Math.floor((((lon0 * (cprNLFunction(rlat1) - 1))
+            int m = (int) (float) Math.floor((((lon0 * (cprNLFunction(rlat1) - 1))
                     - (lon1 * cprNLFunction(rlat1))) / 131072.0) + 0.5);
-            rlon = cprDlonFunction(rlat1, ODD, false) * (cprModInt(m, ni) + lon1 / 131072.0);
+            rlon = cprDlonFunction(rlat1, ODD, false) * (cprModInt(m, ni) + lon1 / 131072.0f);
             rlat = rlat1;
         } else {     // Use even packet.
             int ni = cprNFunction(rlat0, EVEN);
-            int m = (int) Math.floor((((lon0 * (cprNLFunction(rlat0) - 1))
+            int m = (int) (float) Math.floor((((lon0 * (cprNLFunction(rlat0) - 1))
                     - (lon1 * cprNLFunction(rlat0))) / 131072.0) + 0.5);
-            rlon = cprDlonFunction(rlat0, EVEN, false) * (cprModInt(m, ni) + lon0 / 131072.0);
+            rlon = cprDlonFunction(rlat0, EVEN, false) * (cprModInt(m, ni) + lon0 / 131072.0f);
             rlat = rlat0;
         }
 
         // Renormalize to -180 .. +180
-        rlon -= Math.floor((rlon + 180.0) / 360.0) * 360.0;
+        rlon -= (float) Math.floor((rlon + 180.0) / 360.0) * 360.0f;
 
         return new LatLon(rlat, rlon);
     }
@@ -149,18 +149,18 @@ public class CPR implements IConstants {
             int even_cprlat, int even_cprlon,
             int odd_cprlat, int odd_cprlon,
             boolean fflag) {
-        double AirDlat0 = 90.0 / 60.0;
-        double AirDlat1 = 90.0 / 59.0;
-        double lat0 = even_cprlat;
-        double lat1 = odd_cprlat;
-        double lon0 = even_cprlon;
-        double lon1 = odd_cprlon;
-        double rlon, rlat;
+        float AirDlat0 = 90.0f / 60.0f;
+        float AirDlat1 = 90.0f / 59.0f;
+        float lat0 = even_cprlat;
+        float lat1 = odd_cprlat;
+        float lon0 = even_cprlon;
+        float lon1 = odd_cprlon;
+        float rlon, rlat;
 
         // Compute the Latitude Index "j"
-        int j = (int) Math.floor(((59.0 * lat0 - 60.0 * lat1) / 131072.0) + 0.5);
-        double rlat0 = AirDlat0 * (cprModInt(j, 60) + lat0 / 131072.0);
-        double rlat1 = AirDlat1 * (cprModInt(j, 59) + lat1 / 131072.0);
+        int j = (int) (float) Math.floor(((59.0 * lat0 - 60.0 * lat1) / 131072.0) + 0.5);
+        float rlat0 = AirDlat0 * (cprModInt(j, 60) + lat0 / 131072.0f);
+        float rlat1 = AirDlat1 * (cprModInt(j, 59) + lat1 / 131072.0f);
 
         /*
          * Pick the quadrant that's closest to the reference location -
@@ -190,49 +190,49 @@ public class CPR implements IConstants {
          * As a special case, -90, 0 and +90 all encode to zero, so
          * there's a little extra work to do there.
          */
-        if (Double.compare(rlat0, 0.0) == 0) {
-            if (Double.compare(receiverLatLon.getLat(), -45.0) < 0) {
-                rlat0 = -90.0;
-            } else if (Double.compare(receiverLatLon.getLat(), 45.0) > 0) {
-                rlat0 = 90.0;
+        if (Float.compare(rlat0, 0.0f) == 0) {
+            if (Float.compare(receiverLatLon.getLat(), -45.0f) < 0) {
+                rlat0 = -90.0f;
+            } else if (Float.compare(receiverLatLon.getLat(), 45.0f) > 0) {
+                rlat0 = 90.0f;
             }
-        } else if (Double.compare((rlat0 - receiverLatLon.getLat()), 45.0) > 0) {
-            rlat0 -= 90.0;
+        } else if (Float.compare((rlat0 - receiverLatLon.getLat()), 45.0f) > 0) {
+            rlat0 -= 90.0f;
         }
 
-        if (Double.compare(rlat1, 0.0) == 0) {
-            if (Double.compare(receiverLatLon.getLat(), -45.0) < 0) {
-                rlat1 = -90.0;
-            } else if (Double.compare(receiverLatLon.getLat(), 45.0) > 0) {
-                rlat1 = 90.0;
+        if (Float.compare(rlat1, 0.0f) == 0) {
+            if (Float.compare(receiverLatLon.getLat(), -45.0f) < 0) {
+                rlat1 = -90.0f;
+            } else if (Float.compare(receiverLatLon.getLat(), 45.0f) > 0) {
+                rlat1 = 90.0f;
             }
-        } else if (Double.compare((rlat1 - receiverLatLon.getLat()), 45.0) > 0) {
-            rlat1 -= 90.0;
+        } else if (Float.compare((rlat1 - receiverLatLon.getLat()), 45.0f) > 0) {
+            rlat1 -= 90.0f;
         }
         
         // Check to see that the latitude is in range: -90 .. +90
-        if (Double.compare(rlat0, -90.0) < 0 || Double.compare(rlat0, 90.0) > 0 ||
-                Double.compare(rlat1, -90.0) < 0 || Double.compare(rlat1, 90.0) > 0) {
-            return new LatLon(0.0, 0.0); // bad data
+        if (Float.compare(rlat0, -90.0f) < 0 || Float.compare(rlat0, 90.0f) > 0 ||
+                Float.compare(rlat1, -90.0f) < 0 || Float.compare(rlat1, 90.0f) > 0) {
+            return new LatLon(0.0f, 0.0f); // bad data
         }
 
         // Check that both are in the same latitude zone, or abort.
         if (cprNLFunction(rlat0) != cprNLFunction(rlat1)) {
-            return new LatLon(0.0, 0.0); // positions crossed a latitude zone, try again later
+            return new LatLon(0.0f, 0.0f); // positions crossed a latitude zone, try again later
         }
 
         // Compute ni and the Longitude Index "m"
         if (fflag == ODD) { // Use odd packet.
             int ni = cprNFunction(rlat1, ODD);
-            int m = (int) Math.floor((((lon0 * (cprNLFunction(rlat1) - 1))
-                    - (lon1 * cprNLFunction(rlat1))) / 131072.0) + 0.5);
-            rlon = cprDlonFunction(rlat1, ODD, true) * (cprModInt(m, ni) + lon1 / 131072.0);
+            int m = (int) (float) Math.floor((((lon0 * (cprNLFunction(rlat1) - 1))
+                    - (lon1 * cprNLFunction(rlat1))) / 131072.0f) + 0.5f);
+            rlon = cprDlonFunction(rlat1, ODD, true) * (cprModInt(m, ni) + lon1 / 131072.0f);
             rlat = rlat1;
         } else {     // Use even packet.
             int ni = cprNFunction(rlat0, EVEN);
-            int m = (int) Math.floor((((lon0 * (cprNLFunction(rlat0) - 1))
-                    - (lon1 * cprNLFunction(rlat0))) / 131072.0) + 0.5);
-            rlon = cprDlonFunction(rlat0, EVEN, true) * (cprModInt(m, ni) + lon0 / 131072.0);
+            int m = (int) (float) Math.floor((((lon0 * (cprNLFunction(rlat0) - 1))
+                    - (lon1 * cprNLFunction(rlat0))) / 131072.0f) + 0.5f);
+            rlon = cprDlonFunction(rlat0, EVEN, true) * (cprModInt(m, ni) + lon0 / 131072.0f);
             rlat = rlat0;
         }
 
@@ -245,55 +245,55 @@ public class CPR implements IConstants {
          * if reflon is more than 45 degrees away, move some multiple
          * of 90 degrees towards it.
          */
-        rlon += Math.floor((receiverLatLon.getLon() - rlon + 45.0) / 90.0) * 90.0;  // this might move us outside (-180..+180), we fix this below
+        rlon += (float) Math.floor((receiverLatLon.getLon() - rlon + 45.0) / 90.0) * 90.0f;  // this might move us outside (-180..+180), we fix this below
 
         // Renormalize to -180 .. +180
-        rlon -= Math.floor((rlon + 180.0) / 360.0) * 360.0;
+        rlon -= (float) Math.floor((rlon + 180.0) / 360.0) * 360.0f;
 
         return new LatLon(rlat, rlon);
     }
 
     public LatLon decodeCPRrelative(LatLon ref, int cprlat, int cprlon, boolean fflag, boolean surface) {
-        double fractional_lat = cprlat / 131072.0;
-        double fractional_lon = cprlon / 131072.0;
+        float fractional_lat = cprlat / 131072.0f;
+        float fractional_lon = cprlon / 131072.0f;
 
-        double AirDlat = ((surface == true) ? 90.0 : 360.0) / ((fflag == ODD) ? 59.0 : 60.0);
+        float AirDlat = ((surface == true) ? 90.0f : 360.0f) / ((fflag == ODD) ? 59.0f : 60.0f);
 
         // Compute the Latitude Index "j"
-        int j = (int) (Math.floor(ref.getLat() / AirDlat)
-                + Math.floor(0.5 + cprModDouble(ref.getLat(), AirDlat) / AirDlat - fractional_lat));
+        int j = (int) ((float) Math.floor(ref.getLat() / AirDlat)
+                + (float) Math.floor(0.5 + cprModFloat(ref.getLat(), AirDlat) / AirDlat - fractional_lat));
 
-        double rlat = AirDlat * (j + fractional_lat);
+        float rlat = AirDlat * (j + fractional_lat);
 
-        if (Double.compare(rlat, 270.0) >= 0) {
-            rlat -= 360.0;
+        if (Float.compare(rlat, 270.0f) >= 0) {
+            rlat -= 360.0f;
         }
 
         // Check to see that the latitude is in range: -90 .. +90
-        if (Double.compare(rlat, -90.0) < 0 || Double.compare(rlat, 90.0) > 0) {
-            return new LatLon(0.0, 0.0);  // Time to give up - Latitude error
+        if (Float.compare(rlat, -90.0f) < 0 || Float.compare(rlat, 90.0f) > 0) {
+            return new LatLon(0.0f, 0.0f);  // Time to give up - Latitude error
         }
 
         // Check to see that answer is reasonable - ie no more than 1/2 cell away
-        if (Double.compare(Math.abs(rlat - ref.getLat()), (AirDlat / 2.0)) > 0) {
-            return new LatLon(0.0, 0.0); // Time to give up - Latitude error
+        if (Float.compare((float) Math.abs(rlat - ref.getLat()), (AirDlat / 2.0f)) > 0) {
+            return new LatLon(0.0f, 0.0f); // Time to give up - Latitude error
         }
 
         // Compute the Longitude Index "m"
-        double AirDlon = cprDlonFunction(rlat, fflag, surface);
+        float AirDlon = cprDlonFunction(rlat, fflag, surface);
 
         int m = (int) (Math.floor(ref.getLon() / AirDlon)
-                + Math.floor(0.5 + cprModDouble(ref.getLon(), AirDlon) / AirDlon - fractional_lon));
+                + Math.floor(0.5 + cprModFloat(ref.getLon(), AirDlon) / AirDlon - fractional_lon));
 
-        double rlon = AirDlon * (m + fractional_lon);
+        float rlon = AirDlon * (m + fractional_lon);
 
-        if (Double.compare(rlon, 180.0) > 0) {
-            rlon -= 360.0;
+        if (Float.compare(rlon, 180.0f) > 0) {
+            rlon -= 360.0f;
         }
 
         // Check to see that answer is reasonable - ie no more than 1/2 cell away
-        if (Double.compare(Math.abs(rlon - ref.getLon()), (AirDlon / 2.0)) > 0) {
-            return new LatLon(0.0, 0.0);   // Time to give up - Longitude error
+        if (Float.compare(Math.abs(rlon - ref.getLon()), (AirDlon / 2.0f)) > 0) {
+            return new LatLon(0.0f, 0.0f);   // Time to give up - Longitude error
         }
 
         return new LatLon(rlat, rlon);

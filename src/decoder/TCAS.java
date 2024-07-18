@@ -43,11 +43,11 @@ public final class TCAS {
     /*
      * Threat Range
      */
-    private double threatRange;
+    private float threatRange;
     /*
      * Threat Bearing
      */
-    private double threatBearing;
+    private float threatBearing;
     /*
      * Threat Altitude
      */
@@ -78,8 +78,8 @@ public final class TCAS {
         ara = 0;
         rac = 0;
         threatIcaoID = "";
-        threatRange = 0.0;
-        threatBearing = 0.0;
+        threatRange = 0.0f;
+        threatBearing = 0.0f;
         threatAltitude = 0;
         threatRelativeAltitude = 0;
         updateTime = 0L;
@@ -126,7 +126,7 @@ public final class TCAS {
                     int bearing = (int) (data56 & 0x3FL);
 
                     if (bearing > 0 && bearing <= 60) {
-                        threatBearing = bearing * 6.0;
+                        threatBearing = bearing * 6.0f;
                     }
 
                     int range = (int) (((data56 & 0x1FC0) >>> 6) & 0x7F);
@@ -134,13 +134,13 @@ public final class TCAS {
                     if (range > 0 && range <= 127) {
                         switch (range) {
                             case 127:
-                                threatRange = 13.0;    // greater than 12.55 nmi
+                                threatRange = 13.0f;    // greater than 12.55 nmi
                                 break;
                             case 1:
-                                threatRange = .05;     // inside .05 nmi
+                                threatRange = .05f;     // inside .05 nmi
                                 break;
                             default:
-                                threatRange = (double) (range - 1) / 10.0;  // 0.1 to 12.5 nmi
+                                threatRange = (float) (range - 1) / 10.0f;  // 0.1 to 12.5 nmi
                         }
                     }
                 default:
@@ -343,9 +343,9 @@ public final class TCAS {
      * 2...126 = .1 to 12.5 nmi (n - 1) / 10 nmi<br>
      * 127 = Range greater than 12.55 nmi
      *
-     * @return a double representing the range to a threat in nautical miles
+     * @return a float representing the range to a threat in nautical miles
      */
-    public double getThreatRange() {
+    public float getThreatRange() {
         return threatRange;
     }
 
@@ -366,9 +366,9 @@ public final class TCAS {
      * 1...60 = 6.0 to 360.0 degrees (n * 6.0 degrees)<br>
      * 61...63 = Not used
      *
-     * @return a double representing the relative bearing to a threat
+     * @return a float representing the relative bearing to a threat
      */
-    public double getThreatBearing() {
+    public float getThreatBearing() {
         return threatBearing;
     }
 

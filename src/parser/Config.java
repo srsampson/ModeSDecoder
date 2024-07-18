@@ -23,8 +23,8 @@ public final class Config {
     private int radarscan;
     private int radarid;
     //
-    private double latitude;    // degrees
-    private double longitude;   // degrees
+    private float latitude;    // degrees
+    private float longitude;   // degrees
     //
     private Properties Props;
     private String userDir;
@@ -42,8 +42,8 @@ public final class Config {
         databaseTargetTimeout = 3;    // 3 minutes
         amplitude = 0;
         //
-        latitude = 0.0;
-        longitude = 0.0;
+        latitude = 0.0f;
+        longitude = 0.0f;
         //
         Props = null;
         //
@@ -174,25 +174,25 @@ public final class Config {
 
         temp = Props.getProperty("station.latitude");
         if (temp == null) {
-            latitude = 35.0;
+            latitude = 35.0f;
             System.out.println("station.latitude not set, set to 35.0");
         } else {
             try {
-                latitude = Double.parseDouble(temp.trim());
+                latitude = Float.parseFloat(temp.trim());
             } catch (NumberFormatException e) {
-                latitude = 35.0;
+                latitude = 35.0f;
             }
         }
 
         temp = Props.getProperty("station.longitude");
         if (temp == null) {
-            longitude = -97.0;
+            longitude = -97.0f;
             System.out.println("station.longitude not set, set to -97.0");
         } else {
             try {
-                longitude = Double.parseDouble(temp.trim());
+                longitude = Float.parseFloat(temp.trim());
             } catch (NumberFormatException e) {
-                longitude = -97.0;
+                longitude = -97.0f;
             }
         }
     }
@@ -255,11 +255,11 @@ public final class Config {
         return amplitude;
     }
 
-    public double getStationLatitude() {
+    public float getStationLatitude() {
         return latitude;
     }
 
-    public double getStationLongitude() {
+    public float getStationLongitude() {
         return longitude;
     }
 

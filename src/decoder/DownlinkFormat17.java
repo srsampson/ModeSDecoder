@@ -50,12 +50,12 @@ public final class DownlinkFormat17 implements IDF17 {
     private boolean valid;
     private boolean cpr1;
     //
-    private double airspeed;
-    private double indicatedAirspeed;
-    private double trueAirspeed;
-    private double groundSpeed;
-    private double trueHeading;
-    private double magneticHeading;
+    private float airspeed;
+    private float indicatedAirspeed;
+    private float trueAirspeed;
+    private float groundSpeed;
+    private float trueHeading;
+    private float magneticHeading;
     //
     private final String crcValue;
 
@@ -244,8 +244,8 @@ public final class DownlinkFormat17 implements IDF17 {
                         int velocityn_s = ((((dataBytes[3] & 0x7f) << 8) | (dataBytes[4] & 0xE0)) >>> 5) - 1;
 
                         if (velocityn_s == -1 || velocitye_w == -1) {
-                            groundSpeed = -1.0;    // invalid
-                            trueHeading = -1.0;      // invalid
+                            groundSpeed = -1.0f;    // invalid
+                            trueHeading = -1.0f;      // invalid
                         } else {
 
                             trueHeading = thead.trueHeading(velocityn_s, velocitye_w, dirn_s, dire_w);
@@ -255,10 +255,10 @@ public final class DownlinkFormat17 implements IDF17 {
                                 velocityn_s *= 4;
                             }
 
-                            double vX = (double) (velocitye_w * velocitye_w);
-                            double vY = (double) (velocityn_s * velocityn_s);
+                            float vX = (float) (velocitye_w * velocitye_w);
+                            float vY = (float) (velocityn_s * velocityn_s);
 
-                            groundSpeed = Math.sqrt(vX + vY);
+                            groundSpeed = (float) Math.sqrt(vX + vY);
                         }
 
                         diff = (int) ((data56) & 0x7FL) - 1;
@@ -294,7 +294,7 @@ public final class DownlinkFormat17 implements IDF17 {
                         // Decode Heading, Velocity over ground is not known
                         if ((dataBytes[1] & 0x04) == 0x04) {
                             magneticFlag = true;
-                            magneticHeading = (((dataBytes[1] & 0x03) << 8) | dataBytes[2]) * 360.0 / 1024.0;
+                            magneticHeading = (((dataBytes[1] & 0x03) << 8) | dataBytes[2]) * 360.0f / 1024.0f;
                             tasFlag = ((dataBytes[3] & 0x80) == 0x80);
                             airspeed = (((dataBytes[3] & 0x7f) << 3) | ((dataBytes[4] & 0xE0) >>> 3)) - 1;
 
@@ -403,11 +403,11 @@ public final class DownlinkFormat17 implements IDF17 {
         return altitude;
     }
 
-    public double getGroundSpeed() {
+    public float getGroundSpeed() {
         return groundSpeed;
     }
     
-    public double getTrueHeading() {
+    public float getTrueHeading() {
         return trueHeading;
     }
 
@@ -415,11 +415,11 @@ public final class DownlinkFormat17 implements IDF17 {
         return vSpeed;
     }
     
-    public double getAirspeed() {
+    public float getAirspeed() {
         return airspeed;
     }
     
-    public double getMagneticHeading() {
+    public float getMagneticHeading() {
         return magneticHeading;
     }
 

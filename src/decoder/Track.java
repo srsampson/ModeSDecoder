@@ -22,20 +22,21 @@ public final class Track implements IConstants {
     private int verticalTrend;      // -1 = down, 0 = level, 1 = up
     private final int[] trend = new int[10];
     private static int trend_el = 0;
-    private double groundSpeed;      // kts
-    private double groundTrack;      // deg
-    private double groundSpeedComputed;
-    private double groundTrackComputed;
-    private double latitude;        // aircraft position latitude (- is south)
-    private double longitude;       // aircraft position longitude (- is west)
-    private double ias;
-    private double tas;
-    private double heading;
+    private float groundSpeed;      // kts
+    private float groundTrack;      // deg
+    private float groundSpeedComputed;
+    private float groundTrackComputed;
+    private float latitude;        // aircraft position latitude (- is south)
+    private float longitude;       // aircraft position longitude (- is west)
+    private float ias;
+    private float tas;
+    private float heading;
     private String callsign;        // 8 character string
     private String squawk;          // 4 digit octal code
     //
     private int version;
     private int category;
+    private int altitude;
     private int altitudeDF00;
     private int altitudeDF04;
     private int altitudeDF16;
@@ -82,18 +83,19 @@ public final class Track implements IConstants {
         category = 0;
         mode = TRACK_MODE_NORMAL;
         positionMode = POSITION_MODE_UNKNOWN;
-        groundSpeed = -999.0;
-        groundTrack = -999.0;
-        heading = -999.0;
-        groundSpeedComputed = -999.0;
-        groundTrackComputed = -999.0;
-        latitude = -999.0;
-        longitude = -999.0;
-        ias = -999.0;
-        tas = -999.0;
+        groundSpeed = -999.0f;
+        groundTrack = -999.0f;
+        heading = -999.0f;
+        groundSpeedComputed = -999.0f;
+        groundTrackComputed = -999.0f;
+        latitude = -999.0f;
+        longitude = -999.0f;
+        ias = -999.0f;
+        tas = -999.0f;
         radarIID = -99;
         verticalRate = -9999;
         verticalTrend = 0;
+        altitude = -9999;
         altitudeDF00 = -9999;
         altitudeDF04 = -9999;
         altitudeDF16 = -9999;
@@ -326,7 +328,7 @@ public final class Track implements IConstants {
         return verticalTrend;
     }
 
-    public void setGroundSpeed(double val) {
+    public void setGroundSpeed(float val) {
         if (groundSpeed != val) {
             groundSpeed = val;
             updated = true;
@@ -338,7 +340,7 @@ public final class Track implements IConstants {
      *
      * @return target groundspeed in knots
      */
-    public double getGroundSpeed() {
+    public float getGroundSpeed() {
         return groundSpeed;
     }
 
@@ -347,11 +349,11 @@ public final class Track implements IConstants {
      *
      * @return target ground track in degrees true north
      */
-    public double getGroundTrack() {
+    public float getGroundTrack() {
         return groundTrack;
     }
 
-    public void setGroundTrack(double val) {
+    public void setGroundTrack(float val) {
         if (groundTrack != val) {
             groundTrack = val;
             updated = true;
@@ -363,7 +365,7 @@ public final class Track implements IConstants {
      *
      * @return target groundspeed in knots
      */
-    public double getComputedGroundSpeed() {
+    public float getComputedGroundSpeed() {
         return groundSpeedComputed;
     }
 
@@ -373,15 +375,15 @@ public final class Track implements IConstants {
      *
      * @return target ground track in degrees true north
      */
-    public double getComputedGroundTrack() {
+    public float getComputedGroundTrack() {
         return groundTrackComputed;
     }
 
-    public void setComputedGroundSpeed(double val) {
+    public void setComputedGroundSpeed(float val) {
         groundSpeedComputed = val;
     }
 
-    public void setComputedGroundTrack(double val) {
+    public void setComputedGroundTrack(float val) {
         groundTrackComputed = val;
     }
     
@@ -397,7 +399,7 @@ public final class Track implements IConstants {
      * @param val2 Ground Speed in knots
      * @param val3 Vertical Rate in feet per second
      */
-    public void setVelocityData(double val1, double val2, int val3) {
+    public void setVelocityData(float val1, float val2, int val3) {
         boolean changed = false;
 
         if (groundTrack != val1) {
@@ -536,8 +538,8 @@ public final class Track implements IConstants {
     public int getAltitude() {
 
         /*
-         * Return the altitude in this order: DF04, DF00/DF16 (TCAS),
-         * DF17/DF18 (ADS-B)
+         * Return the altitude in this order: DF00, DF17 (ADS-B),
+         * DF04, DF16 (TCAS), DF18 (TIS-B)
          * 
          * Note: DF20 doesn't change often enough to display it
          * 
@@ -547,20 +549,20 @@ public final class Track implements IConstants {
          * Note: It's a toss really, as I see ADS-B and TCAS leading/lagging each other
          * on climbs and descents.  Both are CRC checked.
          */
-        if (altitudeDF04 != 0) {
-            return altitudeDF04;
-        } else if (altitudeDF00 != 0) {
+        if (altitudeDF00 != -9999) {
             return altitudeDF00;
-        } else if (altitudeDF16 != 0) {
-            return altitudeDF16;
-        } else if (altitudeDF17 != 0) {
+        } else if (altitudeDF17 != -9999) {
             return altitudeDF17;
-        } else if (altitudeDF18 != 0) {
+        } else if (altitudeDF04 != -9999) {
+            return altitudeDF04;
+        } else if (altitudeDF16 != -9999) {
+            return altitudeDF16;
+        } else if (altitudeDF18 != -9999) {
             return altitudeDF18;
         }
         
         // punt
-        return 0;
+        return -9999;
     }
 
     public LatLon getPosition() {
@@ -574,18 +576,18 @@ public final class Track implements IConstants {
     /**
      * Method used to return the target latitude in degrees (south is negative)
      *
-     * @return a double Representing the target latitude
+     * @return a float Representing the target latitude
      */
-    public double getLatitude() {
+    public float getLatitude() {
         return latitude;
     }
 
     /**
      * Method used to return the target longitude in degrees (west is negative)
      *
-     * @return a double Representing the target longitude
+     * @return a float Representing the target longitude
      */
-    public double getLongitude() {
+    public float getLongitude() {
         return longitude;
     }
 
@@ -602,14 +604,14 @@ public final class Track implements IConstants {
          * Don't update with the same position
          */
 
-        if ((Double.compare(longitude, latlon.getLon()) != 0) &&
-                Double.compare(latitude, latlon.getLat()) != 0) {
+        if ((Float.compare(longitude, latlon.getLon()) != 0) &&
+                Float.compare(latitude, latlon.getLat()) != 0) {
             /*
              * If a good position is followed by a 0.0 then keep the old
              * position
              */
-            if ((Double.compare(latlon.getLat(), 0.0) != 0) &&
-                    Double.compare(latlon.getLon(), 0.0) != 0) {
+            if ((Float.compare(latlon.getLat(), 0.0f) != 0) &&
+                    Float.compare(latlon.getLon(), 0.0f) != 0) {
                 longitude = latlon.getLon();
                 latitude = latlon.getLat();
                 
@@ -864,39 +866,39 @@ public final class Track implements IConstants {
         return category;
     }
 
-    public void setIAS(double val) {
+    public void setIAS(float val) {
         if (ias != val) {
             ias = val;
             updated = true;
         }
     }
 
-    public double getIAS() {
+    public float getIAS() {
         return ias;
     }
 
-    public void setTAS(double val) {
+    public void setTAS(float val) {
         if (tas != val) {
             tas = val;
             updated = true;
         }
     }
 
-    public double getTAS() {
+    public float getTAS() {
         return tas;
     }
 
     /*
      * This is some ADS-B bo-jive
      */
-    public void setHeading(double val) {
+    public void setHeading(float val) {
         if (heading != val) {
             heading = val;
             updated = true;
         }
     }
 
-    public double getHeading() {
+    public float getHeading() {
         return heading;
     }
 
@@ -938,7 +940,7 @@ public final class Track implements IConstants {
      * Method to add a new TCAS alert for this target at the tail of the queue
      */
     public synchronized void insertTCAS(long data56, long time) {
-        TCAS tcas = new TCAS(data56, time, getAltitude());
+        TCAS tcas = new TCAS(data56, time, getAltitudeDF16());
 
         /*
          * Some TCAS are just advisory, no RA generated

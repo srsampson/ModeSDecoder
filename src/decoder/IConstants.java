@@ -7,17 +7,17 @@ public interface IConstants {
 
     public static final long MAXTIME = 10L * 1000L;         // 10 Seconds
     //
-    public static final double Exp12 = 4096.0;              // TIS-B Course Position Bins 2^12
-    public static final double Exp17 = 131072.0;            // Airborne Position Bins 2^17
-    public static final double Exp19 = 524288.0;            // Surface Position Bins 2^19
+    public static final float Exp12 = 4096.0f;              // TIS-B Course Position Bins 2^12
+    public static final float Exp17 = 131072.0f;            // Airborne Position Bins 2^17
+    public static final float Exp19 = 524288.0f;            // Surface Position Bins 2^19
     //
-    public static final double NAUTICAL_MILES = 0.000539957;// conversion from meters
-    public static final double TAU = Math.PI * 2.0;
+    public static final float NAUTICAL_MILES = 0.000539957f;// conversion from meters
+    public static final float TAU = (float) (Math.PI * 2.0);
     //
-    public static final double DlatEven = (360.0 / 60.0);   // Airborne Even
-    public static final double DlatOdd = (360.0 / 59.0);    // Airborne Odd
-    public static final double DlatSEven = (90.0 / 60.0);   // Surface Even
-    public static final double DlatSOdd = (90.0 / 59.0);    // Surface Odd
+    public static final float DlatEven = (360.0f / 60.0f);   // Airborne Even
+    public static final float DlatOdd = (360.0f / 59.0f);    // Airborne Odd
+    public static final float DlatSEven = (90.0f / 60.0f);   // Surface Even
+    public static final float DlatSOdd = (90.0f / 59.0f);    // Surface Odd
     //
     public static final boolean EVEN = false;
     public static final boolean ODD = true;

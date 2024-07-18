@@ -12,7 +12,7 @@ public interface ITrueHeading {
      * @param velocitye_w an integer velocity east/west
      * @param signlat an integer sign bit for latitude (0 = North, 1 = South)
      * @param signlon an integer sign bit for longitude (0 = East, 1 = West)
-     * @return double representing heading in degrees true north
+     * @return float representing heading in degrees true north
      */
-    public double trueHeading(int velocityn_s, int velocitye_w, int signlat, int signlon);
+    public float trueHeading(int velocityn_s, int velocitye_w, int signlat, int signlon);
 }

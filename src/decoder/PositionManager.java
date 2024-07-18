@@ -188,7 +188,7 @@ public final class PositionManager implements IConstants {
                             latlon = cpr.decodeCPRairborne(latEven, longEven, latOdd, longOdd, cpr1);
                         }
 
-                        if (latlon.getLat() != 0.0 && latlon.getLon() != 0.0) {
+                        if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
                             if (df.hasTarget(acid)) {
                                 df.updateTargetLatLon(acid, latlon, mode, zulu);
                             } else {
@@ -222,7 +222,7 @@ public final class PositionManager implements IConstants {
                             mode = POSITION_MODE_RELATIVE_AIRBORNE;
                         }
 
-                        if (latlon.getLat() != 0.0 && latlon.getLon() != 0.0) {
+                        if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
                             if (df.hasTarget(acid)) {
                                 df.updateTargetLatLon(acid, latlon, mode, zulu);
                             } else {
@@ -289,46 +289,49 @@ public final class PositionManager implements IConstants {
      */
     private void encodeCPR() {
         // Airborne and TIS-B fine
-        double yz17Even = Math.floor(Exp17 * cpr.cprModDouble(receiverLatLon.getLat(), DlatEven) / DlatEven + .5);
-        double yz17Odd = Math.floor(Exp17 * cpr.cprModDouble(receiverLatLon.getLat(), DlatOdd) / DlatOdd + .5);
-        double rlat17Even = DlatEven * ((yz17Even / Exp17) + Math.floor(receiverLatLon.getLat() / DlatEven));
-        double rlat17Odd = DlatOdd * ((yz17Odd / Exp17) + Math.floor(receiverLatLon.getLat() / DlatOdd));
+        float yz17Even = (float) Math.floor(Exp17 * cpr.cprModFloat(receiverLatLon.getLat(), DlatEven) / DlatEven + .5);
+        float yz17Odd = (float) Math.floor(Exp17 * cpr.cprModFloat(receiverLatLon.getLat(), DlatOdd) / DlatOdd + .5);
+        float rlat17Even = DlatEven * ((yz17Even / Exp17) + (float) Math.floor(receiverLatLon.getLat() / DlatEven));
+        float rlat17Odd = DlatOdd * ((yz17Odd / Exp17) + (float) Math.floor(receiverLatLon.getLat() / DlatOdd));
 
         // Surface 19-bits
-        double yz19Even = Math.floor(Exp19 * cpr.cprModDouble(receiverLatLon.getLat(), DlatSEven) / DlatSEven + .5);
-        double yz19Odd = Math.floor(Exp19 * cpr.cprModDouble(receiverLatLon.getLat(), DlatSOdd) / DlatSOdd + .5);
-        double rlat19Even = DlatSEven * ((yz19Even / Exp19) + Math.floor(receiverLatLon.getLat() / DlatSEven));
-        double rlat19Odd = DlatSOdd * ((yz19Odd / Exp19) + Math.floor(receiverLatLon.getLat() / DlatSOdd));
+        float yz19Even = (float) Math.floor(Exp19 * cpr.cprModFloat(receiverLatLon.getLat(), DlatSEven) / DlatSEven + .5);
+        float yz19Odd = (float) Math.floor(Exp19 * cpr.cprModFloat(receiverLatLon.getLat(), DlatSOdd) / DlatSOdd + .5);
+        float rlat19Even = DlatSEven * ((yz19Even / Exp19) + (float) Math.floor(receiverLatLon.getLat() / DlatSEven));
+        float rlat19Odd = DlatSOdd * ((yz19Odd / Exp19) + (float) Math.floor(receiverLatLon.getLat() / DlatSOdd));
 
         // TIS-B Course 12-bits
-        double yz12Even = Math.floor(Exp12 * cpr.cprModDouble(receiverLatLon.getLat(), DlatEven) / DlatEven + .5);
-        double yz12Odd = Math.floor(Exp12 * cpr.cprModDouble(receiverLatLon.getLat(), DlatOdd) / DlatOdd + .5);
-        double rlat12Even = DlatEven * ((yz12Even / Exp12) + Math.floor(receiverLatLon.getLat() / DlatEven));
-        double rlat12Odd = DlatOdd * ((yz12Odd / Exp12) + Math.floor(receiverLatLon.getLat() / DlatOdd));
+        float yz12Even = (float) Math.floor(Exp12 * cpr.cprModFloat(receiverLatLon.getLat(), DlatEven) / DlatEven + .5);
+        float yz12Odd = (float) Math.floor(Exp12 * cpr.cprModFloat(receiverLatLon.getLat(), DlatOdd) / DlatOdd + .5);
+        float rlat12Even = DlatEven * ((yz12Even / Exp12) + (float) Math.floor(receiverLatLon.getLat() / DlatEven));
+        float rlat12Odd = DlatOdd * ((yz12Odd / Exp12) + (float) Math.floor(receiverLatLon.getLat() / DlatOdd));
 
         int temp = cpr.cprNLFunction(rlat12Odd) - 1;
         temp = (temp == 0) ? 1 : temp;
-        double dlon12Even = 360.0 / (double) cpr.cprNLFunction(rlat12Even);
-        double dlon12Odd = 360.0 / (double) temp;
+        
+        float dlon12Even = 360.0f / cpr.cprNLFunction(rlat12Even);
+        float dlon12Odd = 360.0f / (float) temp;
 
         temp = cpr.cprNLFunction(rlat17Odd) - 1;
         temp = (temp == 0) ? 1 : temp;
-        double dlon17Even = 360.0 / (double) cpr.cprNLFunction(rlat17Even);
-        double dlon17Odd = 360.0 / (double) temp;
+        
+        float dlon17Even = 360.0f / cpr.cprNLFunction(rlat17Even);
+        float dlon17Odd = 360.0f / (float) temp;
 
         temp = cpr.cprNLFunction(rlat19Odd) - 1;
         temp = (temp == 0) ? 1 : temp;
-        double dlon19Even = 90.0 / (double) cpr.cprNLFunction(rlat19Even);
-        double dlon19Odd = 90.0 / (double) temp;
+        
+        float dlon19Even = 90.0f / (float) cpr.cprNLFunction(rlat19Even);
+        float dlon19Odd = 90.0f / (float) temp;
 
-        double xz12Even = Math.floor(Exp12 * cpr.cprModDouble(receiverLatLon.getLon(), dlon12Even) / dlon12Even + .5);
-        double xz12Odd = Math.floor(Exp12 * cpr.cprModDouble(receiverLatLon.getLon(), dlon12Odd) / dlon12Odd + .5);
+        float xz12Even = (float) Math.floor(Exp12 * cpr.cprModFloat(receiverLatLon.getLon(), dlon12Even) / dlon12Even + .5);
+        float xz12Odd = (float) Math.floor(Exp12 * cpr.cprModFloat(receiverLatLon.getLon(), dlon12Odd) / dlon12Odd + .5);
 
-        double xz17Even = Math.floor(Exp17 * cpr.cprModDouble(receiverLatLon.getLon(), dlon17Even) / dlon17Even + .5);
-        double xz17Odd = Math.floor(Exp17 * cpr.cprModDouble(receiverLatLon.getLon(), dlon17Odd) / dlon17Odd + .5);
+        float xz17Even = (float) Math.floor(Exp17 * cpr.cprModFloat(receiverLatLon.getLon(), dlon17Even) / dlon17Even + .5);
+        float xz17Odd = (float) Math.floor(Exp17 * cpr.cprModFloat(receiverLatLon.getLon(), dlon17Odd) / dlon17Odd + .5);
 
-        double xz19Even = Math.floor(Exp19 * cpr.cprModDouble(receiverLatLon.getLon(), dlon19Even) / dlon19Even + .5);
-        double xz19Odd = Math.floor(Exp19 * cpr.cprModDouble(receiverLatLon.getLon(), dlon19Odd) / dlon19Odd + .5);
+        float xz19Even = (float) Math.floor(Exp19 * cpr.cprModFloat(receiverLatLon.getLon(), dlon19Even) / dlon19Even + .5);
+        float xz19Odd = (float) Math.floor(Exp19 * cpr.cprModFloat(receiverLatLon.getLon(), dlon19Odd) / dlon19Odd + .5);
 
         receiverLatitudeTisbCourseEven = (long) yz12Even & 0x0FFF;
         receiverLongitudeTisbCourseEven = (long) xz12Even & 0x0FFF;

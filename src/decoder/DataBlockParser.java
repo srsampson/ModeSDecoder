@@ -68,10 +68,10 @@ public final class DataBlockParser extends Thread {
     private long data56;
     private long detectTime;
     //
-    private double groundSpeed;
-    private double trueHeading;
-    private double magneticHeading;
-    private double airspeed;
+    private float groundSpeed;
+    private float trueHeading;
+    private float magneticHeading;
+    private float airspeed;
     //
     private int vSpeed;
     private int category;
@@ -446,7 +446,7 @@ public final class DataBlockParser extends Thread {
         }
     }
 
-    private void updateTargetMagneticHeadingIAS(String hexid, double head, double ias, int vvel, long time) {
+    private void updateTargetMagneticHeadingIAS(String hexid, float head, float ias, int vvel, long time) {
         try {
             Track tgt = getTarget(hexid);
             tgt.setHeading(head);
@@ -459,7 +459,7 @@ public final class DataBlockParser extends Thread {
         }
     }
 
-    private void updateTargetMagneticHeadingTAS(String hexid, double head, double tas, int vvel, long time) {
+    private void updateTargetMagneticHeadingTAS(String hexid, float head, float tas, int vvel, long time) {
         try {
             Track tgt = getTarget(hexid);
             tgt.setHeading(head);
@@ -561,7 +561,7 @@ public final class DataBlockParser extends Thread {
         }
     }
 
-    private void updateTargetGroundSpeedTrueHeading(String hexid, double gs, double th, int vs, long time) {
+    private void updateTargetGroundSpeedTrueHeading(String hexid, float gs, float th, int vs, long time) {
         try {
             Track tgt = getTarget(hexid);
             tgt.setGroundSpeed(gs);
@@ -1008,7 +1008,7 @@ public final class DataBlockParser extends Thread {
                                         trueHeading = df18.getTrueHeading();
                                         vSpeed = df18.getVspeed();
 
-                                        if (!(Double.compare(trueHeading, -1.0) == 0)) {
+                                        if (!(Float.compare(trueHeading, -1.0f) == 0)) {
                                             updateTargetGroundSpeedTrueHeading(acid, groundSpeed, trueHeading, vSpeed, detectTime);
                                         }
                                         break;
@@ -1160,7 +1160,7 @@ public final class DataBlockParser extends Thread {
                             ground = 0;
                         }
 
-                        if (exists > 0) {         // target exists
+                                         if (exists > 0) {         // target exists
                             queryString = String.format("UPDATE target SET utcupdate=%d,"
                                     + "radariid=NULLIF(%d, -99),"
                                     + "si=%d,"
@@ -1350,10 +1350,10 @@ public final class DataBlockParser extends Thread {
                                         + "%d,"
                                         + "'%s',"
                                         + "%d,"
-                                        + "NULLIF(%d, -99), %d," // radariid & si
+                                        + "%d, %d," // radariid & si
                                         + "%f,"
                                         + "%f,"
-                                        + "NULLIF(%d, -9999),"
+                                        + "%d,"
                                         + "%d,"
                                         + "%d)",
                                         acid,
