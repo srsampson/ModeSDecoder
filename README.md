@@ -16,4 +16,4 @@ Currently it only updates the registration (N-Number) for USA aircraft, as they 
 
 With a database, you can then grab data and display it on a GUI.
 
-![Sample Display](Screenshot 2024-07-19 130419.png)
+![Sample Display](radar.png)
