@@ -36,7 +36,7 @@ CREATE TABLE `callsign` (
   UNIQUE KEY `Index_Callsign` (`acid`,`callsign`,`flight_id`,`radar_id`),
   KEY `FK_callsign_acid` (`acid`),
   CONSTRAINT `FK_callsign_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsigns Associated with Targets';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsigns Associated with Targets';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -106,7 +106,7 @@ CREATE TABLE `target` (
   UNIQUE KEY `FltIDIndex` (`flight_id`,`acid`,`radar_id`) USING BTREE,
   KEY `FK_acid` (`acid`),
   CONSTRAINT `FK_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Active Target Tracks';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Active Target Tracks';
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -171,7 +171,7 @@ CREATE TABLE `targetecho` (
   PRIMARY KEY (`record_num`),
   KEY `FK_targetecho_acid` (`acid`),
   CONSTRAINT `FK_targetecho_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='History of Target Positions';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='History of Target Positions';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -186,8 +186,8 @@ CREATE TABLE `targethistory` (
   `flight_id` bigint unsigned NOT NULL DEFAULT '0',
   `radar_id` int unsigned NOT NULL DEFAULT '0',
   `acid` char(6) NOT NULL,
-  `utcdetect` timestamp NULL DEFAULT NULL COMMENT 'UTC Time detected',
-  `utcfadeout` timestamp NULL DEFAULT NULL COMMENT 'UTC Fadeout Time',
+  `utcdetect` timestamp NOT NULL COMMENT 'UTC Time detected',
+  `utcfadeout` timestamp NOT NULL COMMENT 'UTC Fadeout Time',
   `radariid` int DEFAULT NULL,
   `si` tinyint(1) NOT NULL DEFAULT '0',
   `altitude` int DEFAULT NULL,
@@ -220,7 +220,35 @@ CREATE TABLE `targethistory` (
   UNIQUE KEY `FltIDIndex` (`flight_id`,`acid`,`radar_id`) USING BTREE,
   KEY `FK_targethistory_acid` (`acid`),
   CONSTRAINT `FK_targethistory_acid` FOREIGN KEY (`acid`) REFERENCES `modestable` (`acid`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Targets No Longer Active';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Targets No Longer Active';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tcasalerts`
+--
+
+DROP TABLE IF EXISTS `tcasalerts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tcasalerts` (
+  `record_num` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'TCAS ID',
+  `utcupdate` bigint unsigned NOT NULL COMMENT 'The updatetime will be zero 0 if the activeRA is false',
+  `acid` char(6) NOT NULL COMMENT 'Aircraft ID',
+  `ttibits` int unsigned DEFAULT NULL,
+  `threatid` char(6) NOT NULL COMMENT 'Threat ICAO ID',
+  `threatrelativealtitude` int DEFAULT NULL,
+  `altitude` int DEFAULT NULL,
+  `bearing` int DEFAULT NULL,
+  `range` int DEFAULT NULL,
+  `arabits` int DEFAULT NULL,
+  `racbits` int DEFAULT NULL,
+  `active_ra` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'single_ra || multiple_ra true',
+  `single_ra` tinyint(1) NOT NULL DEFAULT '0',
+  `multiple_ra` tinyint(1) NOT NULL DEFAULT '0',
+  `multiplethreats` tinyint(1) NOT NULL DEFAULT '0',
+  `threatterminated` tinyint(1) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`record_num`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TCAS Alerts';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -240,4 +268,4 @@ CREATE TABLE `targethistory` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-18  2:34:33
+-- Dump completed on 2024-07-19 14:57:36
