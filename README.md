@@ -8,12 +8,12 @@ In the TrackView Application, targets with more than one data source have a fill
 
 This is a hobby program I've played around with to store Mode-S and ADS-B data in a MySQL database, to see what is what flying around the city.
 
-The database is designed so that as new targets come in, their Mode-S ICAO number is added to the ```modestable``` table, and the positions saved in the ```target``` and ```targetecho``` table. Sooner or later this aircraft will land or fade-out, and the database will move it to the ```history``` table. If it pops up again, then it is issued a new flight number. The data in the ```target``` table then, is the current data. When those targets fade or land, they are deleted from this table, and moved to the ```targethistory``` table.
+The database is designed so that as new targets come in, their Mode-S ICAO number is added to the ```modestable``` table, and the positions saved in the ```target``` and ```targetecho``` table. Sooner or later this aircraft will land or fade-out, and the database will move it to the ```targethistory``` table. If it pops up again, then it is issued a new flight number. The data in the ```target``` table then, is the current data.
 
 Currently it only updates the registration (N-Number) for USA aircraft, as they are assigned 1:1, and I don't have any info on other countries. I don't do an Internet lookup, as most sites don't allow it for free.
 
 ![Sample Query](sample.png)
 
-With a database, you can then grab data and display it on a GUI for example (my antenna is on my desk and is not very good).
+With a database, you can then grab data and display it on a GUI.
 
 ![Sample Display](radar.png)
