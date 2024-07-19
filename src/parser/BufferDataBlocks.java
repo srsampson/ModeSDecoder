@@ -22,6 +22,7 @@ public final class BufferDataBlocks extends Thread {
     private final BeastMessageParser bmp;
     private final char[] hexArray;
     private final int amplitude;
+    private boolean EOF;
     //
     private final Config config;
 
@@ -32,7 +33,6 @@ public final class BufferDataBlocks extends Thread {
         config = cf;
         
         amplitude = config.getAmplitude();
-
         data_pipe = p;
         recordQueue = new ArrayList<>();
 
@@ -43,6 +43,7 @@ public final class BufferDataBlocks extends Thread {
 
     @Override
     public void start() {
+        EOF = false;
         process.start();
     }
 
@@ -51,6 +52,7 @@ public final class BufferDataBlocks extends Thread {
      */
     public void close() {
         resetQueue();
+        EOF = true;
     }
 
     /*
@@ -117,7 +119,7 @@ public final class BufferDataBlocks extends Thread {
         byte[] modes;
         int available;
 
-        while (true) {
+        while (EOF == false) {
             try {
                 while ((available = data_pipe.available()) != 0) {
                     modes = new byte[available];

@@ -5,6 +5,13 @@
  * It reads the Serial Port data and combines data into targets.
  * The targets are then stored and updated in a MySQL Database.
  *
+ * My thanks to Kinetic Avionic UK, who got us all started in
+ * the hobby with their SBS-1, which was a fantastic kit
+ * with its FPGA decoder.
+ *
+ * My thanks also to Jetvision and Günter Köllner for his
+ * fantastic FPGA based 1090 receiver called the Mode-S Beast.
+ *
  * Public Domain (p) 2024 Steve Sampson, K5OKC
  */
 package parser;
@@ -64,6 +71,27 @@ public final class ModeSDecoder {
         }
         
         /*
+         * Note: The Switches on the Beast are
+         * a real bitch. They are so small that you
+         * need a magnifying glass and a sharp stick.
+         *
+         * But you can also send the switch config settings
+         * using the serial port (Except for Baud Rate).
+         *
+         * Toward the LEDS = OPEN
+         * AWAY from the LEDS = CLOSED
+         *
+         * SW1, SW2 = OPEN (Normal Baud Rate)
+         *
+         * SW3 = CLOSED (Binary Format)                c,C option
+         * SW4 = OPEN (All DF Decoded)                 d,D
+         * SW5 = CLOSED (MLAT Counter Enabled)         e,E
+         * SW6 = OPEN (CRC on DF-11, DF-17, DF-18)     f,F
+         * SW7 = OPEN (DF-0/DF-4/DF-5 filter Off)      g,G
+         * SW8 = CLOSED (Hardware Handshake)           h,H
+         * SW9 = CLOSED (FEC Off)                      i,I
+         * SW10 = OPEN (No Mode-A/C)                   j,J
+         *
          * Connect to the Serial Communications Port
          */
         port = SerialPort.getCommPort(config.getCommPort());
@@ -84,7 +112,12 @@ public final class ModeSDecoder {
             System.err.println("Fatal: Unable to set Baud Rate on Serial Port");
             System.exit(0);
         }
-        
+
+        /*
+         * Setup the Beast modes the way I like it (recommended by JetVision)
+         */
+        beastSetup();
+
         comm_input = port.getInputStream();
 
         receiverLatLon = new LatLon(config.getStationLatitude(), config.getStationLongitude());
@@ -99,5 +132,62 @@ public final class ModeSDecoder {
         recv.start();
         bufferData.start();
         parser.start();
+    }
+    
+    /*
+     * Amateur Hour here, just git-er-done...
+     */
+    private static void beastSetup() {
+        byte[] optionsmsg = new byte[3];
+        boolean error = false;
+
+        optionsmsg[0] = 0x1a;   // Escape
+        optionsmsg[1] = 0x31;   // '1'
+        optionsmsg[2] = 'C';    // binary mode command
+
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+
+        optionsmsg[2] = 'd';  // Pass All DF
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+        
+        optionsmsg[2] = 'E';  // MLAT enabled
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+        
+        optionsmsg[2] = 'f';  // CRC off
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+        
+        optionsmsg[2] = 'g';  // DF0,4,5 Filter off
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+        
+        optionsmsg[2] = 'H';  // Hardware handshake
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+        
+        optionsmsg[2] = 'I';  // FEC off
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+        
+        optionsmsg[2] = 'J';  // No Mode-A/C
+        if (port.writeBytes(optionsmsg, 3) != 3) {
+            error = true;
+        }
+        
+        if (error == true) {
+            System.out.printf("Beast Switch Command %c Failed\n", (char) optionsmsg[2]);
+        } else {
+            System.out.println("Mode-S Beast Switches Configured");
+        }
     }
 }

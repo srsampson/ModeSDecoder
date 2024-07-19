@@ -36,7 +36,6 @@ public final class Track implements IConstants {
     //
     private int version;
     private int category;
-    private int altitude;
     private int altitudeDF00;
     private int altitudeDF04;
     private int altitudeDF16;
@@ -95,7 +94,6 @@ public final class Track implements IConstants {
         radarIID = -99;
         verticalRate = -9999;
         verticalTrend = 0;
-        altitude = -9999;
         altitudeDF00 = -9999;
         altitudeDF04 = -9999;
         altitudeDF16 = -9999;
@@ -664,7 +662,7 @@ public final class Track implements IConstants {
     public void setSquawk(String val) {
         if (val.equals("") == false) {
             if (val.equals(squawk) == false) {
-                if (val.equals("0000") == false) {      // don't switch from a good to 0 code            squawk = val;
+                if (val.equals("0000") == false) {      // don't switch from a good to 0 code
                     squawk = val;
                     updated = true;
                     emergency = val.equals("7700");
@@ -961,7 +959,7 @@ public final class Track implements IConstants {
             try {
                 tcasAlerts.add(tcas);
             } catch (UnsupportedOperationException | IllegalArgumentException | ClassCastException | NullPointerException e) {
-                System.err.println("Target::insertTCAS Exception during addElement " + e.toString());
+                System.err.println("Target::insertTCAS Exception during addElement " + e.getMessage());
             }
         }
     }
@@ -982,7 +980,7 @@ public final class Track implements IConstants {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Target::getTCASAlerts Exception during addElement " + e.toString());
+                System.err.println("Target::getTCASAlerts Exception during addElement " + e.getMessage());
             }
         }
 
@@ -992,20 +990,20 @@ public final class Track implements IConstants {
     /*
      * Method to remove expired TCAS alerts from queue
      * 
-     * @param t a long representing the current time in milliseconds
+     * @param time a long representing the current time in milliseconds
      */
-    public void removeTCAS(long t) {
-        t -= 60000L;         // subtract 60 seconds
+    public void removeTCAS(long time) {
+        time -= 60000L;         // subtract 60 seconds
         
         synchronized(tcasAlerts) {
             try {
                 for (int i = 0; i < tcasAlerts.size(); i++) {
-                    if (tcasAlerts.get(i).getUpdateTime() <= t) {
+                    if (tcasAlerts.get(i).getUpdateTime() <= time) {
                         tcasAlerts.remove(i);
                     }
                 }
             } catch (Exception e2) {
-                System.err.println("Target::removeTCAS Exception during remove " + e2.toString());
+                System.err.println("Target::removeTCAS Exception during remove " + e2.getMessage());
             }
         }
     }

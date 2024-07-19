@@ -37,7 +37,7 @@ public final class Config {
         String temp;
 
         commPort = "COM4";
-        radarscan = 3;
+        radarscan = 3;      // simulates a 20 RPM antenna, 10 would be 6 RPM
         radarid = 0;
         databaseTargetTimeout = 3;    // 3 minutes
         amplitude = 0;
@@ -60,7 +60,7 @@ public final class Config {
             Props = new Properties();
             Props.load(in);
         } catch (IOException e1) {
-            System.out.println("JModeS::Config Fatal: Unable to read configuration file " + OSConfPath);
+            System.out.println("ModeSDecoder::Config Fatal: Unable to read configuration file " + OSConfPath);
             System.exit(-1);
         }
 

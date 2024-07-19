@@ -20,7 +20,7 @@ public final class SerialPipe extends Thread {
         EOF = false;
 
         dataReceive = new Thread(this);
-        dataReceive.setName("SerialPipe");
+        dataReceive.setName("SerialPipe");  // for debugging
         dataReceive.setPriority(Thread.NORM_PRIORITY);
     }
 
@@ -57,7 +57,7 @@ public final class SerialPipe extends Thread {
                     if (val != -1) {
                         output.write(data, 0, data.length);
                     } else {
-                        System.out.println("SeialPipe::run Write Pipe Overrun");
+                        System.out.println("SerialPipe::run Write Pipe Overrun");
                         sleep(10);
                     }
                 }

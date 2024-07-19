@@ -121,6 +121,14 @@ public final class TCAS {
                     int d3 = ((data13 & 0x0010) >>> 2) + ((data13 & 0x0004) >>> 1) + ((data13 & 0x0001));
 
                     threatAltitude = alt.modecDecode(a3, b3, c3, d3);
+                    
+                    /*
+                     * Hopefully targetAltitude isn't -9999 (NULL) or 0
+                     */
+                    if (targetAltitude == -9999 || targetAltitude == 0) {
+                        break; // punt
+                    }
+                    
                     threatRelativeAltitude = targetAltitude - threatAltitude;
 
                     int bearing = (int) (data56 & 0x3FL);

@@ -30,8 +30,6 @@ public final class Shutdown extends Thread {
         
         serialpipe.close();
         datablockparser.close();
-        
-        bufferdatablock.resetQueue(); // empty the list
         bufferdatablock.close();
 
         try {
