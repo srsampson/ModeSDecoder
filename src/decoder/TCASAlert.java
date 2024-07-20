@@ -11,13 +11,13 @@ package decoder;
  * TCAS advisories that are threats to this aircraft.
  *
  * <p>
- * These TCAS Objects will be placed on a Queue as they come in, and expired off
- * the Queue after about 1 minute.
+ * These TCAS Objects will be placed in database as they come in,
+ * and expired after about 1 minute.
  *
  * <p>
  * Since there is nothing to key on, There will be duplicates.
  */
-public final class TCAS {
+public final class TCASAlert {
 
     private final Altitude alt = new Altitude();
     //
@@ -73,7 +73,7 @@ public final class TCAS {
      */
     private boolean threatTerminated;
 
-    public TCAS(long data56, long time, int targetAltitude) {
+    public TCASAlert(long data56, long time, int targetAltitude) {
         tti = 0;
         ara = 0;
         rac = 0;
@@ -290,6 +290,18 @@ public final class TCAS {
         return (activeRA && multipleRA);
     }
 
+    public boolean getActiveRA() {
+        return activeRA;
+    }
+
+    public boolean getSingleRA() {
+        return singleRA;
+    }
+
+    public boolean getMultipleRA() {
+        return multipleRA;
+    }
+    
     /**
      * Method to return the Threat Type Indicator (TTI)
      *

@@ -3,16 +3,11 @@
  */
 package decoder;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /*
  * This is the vehicle track object
  */
 public final class Track implements IConstants {
 
-    private final List<TCAS> tcasAlerts;
-    //
     private String acid;            // Aircraft ID
     private String registration;    // N-Number if USA registered
     private int mode;               // Track mode
@@ -109,7 +104,6 @@ public final class Track implements IConstants {
                 = hadEmergency = hadSPI = si = hijack = comm_out = false;
         updated = updatePosition = false;
         isOnGround = isVirtOnGround = false;
-        tcasAlerts = new ArrayList<>();
     }
 
     /**
@@ -915,96 +909,5 @@ public final class Track implements IConstants {
 
     public boolean getRelayed() {
         return isRelayed;
-    }
-
-    /**
-     * Method to determine if there are any TCAS alerts on the queue
-     *
-     * @return a boolean Representing whether there are TCAS alerts on the queue
-     */
-    public boolean hasTCASAlerts() {
-        synchronized(tcasAlerts) {
-            return tcasAlerts.isEmpty() == false;
-        }
-    }
-
-    /**
-     * Method to return the number of TCAS alerts on the queue
-     *
-     * @return an integer representing the number of TCAS alerts on the queue
-     */
-    public int getNumberOfTCASAlerts() {
-        synchronized(tcasAlerts) {
-            return tcasAlerts.size();
-        }
-    }
-
-    /*
-     * Method to add a new TCAS alert for this target at the tail of the queue
-     */
-    public void insertTCAS(long data56, long time) {
-        TCAS tcas = new TCAS(data56, time, getAltitudeDF16());
-
-        /*
-         * Some TCAS are just advisory, no RA generated
-         * So we keep these off the table, as they are basically junk.
-         * 
-         * TCAS class only sets time if RA is active.
-         */
-        if (tcas.getUpdateTime() == 0L) {
-            return;
-        }
-
-        synchronized(tcasAlerts) {
-            try {
-                tcasAlerts.add(tcas);
-            } catch (UnsupportedOperationException | IllegalArgumentException | ClassCastException | NullPointerException e) {
-                System.err.println("Target::insertTCAS Exception during addElement " + e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * Method to return a list TCAS alerts
-     *
-     * @return a vector of TCAS alert objects
-     */
-    public List<TCAS> getTCASAlerts() {
-        List<TCAS> result = new ArrayList<>();
-
-        synchronized(tcasAlerts) {
-            try {
-                for (int i = 0; i < tcasAlerts.size(); i++) {
-                    if (tcasAlerts.get(i).getThreatTerminated() == false) {
-                        result.add(tcasAlerts.get(i));
-                    }
-                }
-            } catch (Exception e) {
-                System.err.println("Target::getTCASAlerts Exception during addElement " + e.getMessage());
-            }
-        }
-
-        return result;
-    }
-
-    /*
-     * Method to remove expired TCAS alerts from queue
-     * 
-     * @param time a long representing the current time in milliseconds
-     */
-    public void removeTCAS(long time) {
-        time -= 60000L;         // subtract 60 seconds
-        
-        synchronized(tcasAlerts) {
-            try {
-                for (int i = 0; i < tcasAlerts.size(); i++) {
-                    if (tcasAlerts.get(i).getUpdateTime() <= time) {
-                        tcasAlerts.remove(i);
-                    }
-                }
-            } catch (Exception e2) {
-                System.err.println("Target::removeTCAS Exception during remove " + e2.getMessage());
-            }
-        }
     }
 }

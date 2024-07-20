@@ -74,7 +74,8 @@ public final class DownlinkFormat17 implements IDF17 {
 
         pm = p;
         timestamp = time;
-        
+        callsign = "";
+
         /*
          * By running the first 88 bits into the CRC, and then XOR the last 24
          * bits, you should get 000000.

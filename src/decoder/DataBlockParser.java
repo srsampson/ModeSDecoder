@@ -28,6 +28,7 @@ public final class DataBlockParser extends Thread {
 
     private static final long RATE1 = 30L * 1000L;              // 30 seconds
     private static final long RATE2 = 5L * 1000L;               // 5 seconds
+    private static final long RATE3 = 60L * 1000L;         // 1 minute
     //
     private final ConcurrentHashMap<String, Track> targets;
     //
@@ -57,7 +58,7 @@ public final class DataBlockParser extends Thread {
     private String data;
     private String acid;
     private String callsign;
-    private String modeA;
+    private String squawk;
     //
     private boolean isOnGround;
     private boolean emergency;
@@ -81,9 +82,11 @@ public final class DataBlockParser extends Thread {
     //
     private final Timer timer1;
     private final Timer timer2;
+    private final Timer timer3;
     //
     private final TimerTask task1;
     private final TimerTask task2;
+    private final TimerTask task3;
 
     public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd) {
         zulu = new ZuluMillis();
@@ -94,6 +97,8 @@ public final class DataBlockParser extends Thread {
         radarid = cf.getRadarID();
         radarscan = (long) cf.getRadarScanTime() * 1000L;
         acid = "";
+        callsign = "";
+        squawk = "";
         EOF = false;        
 
         String connectionURL = config.getDatabaseURL();
@@ -141,6 +146,10 @@ public final class DataBlockParser extends Thread {
         task2 = new UpdateTrackQuality();
         timer2 = new Timer();
         timer2.scheduleAtFixedRate(task2, 10L, RATE2);
+        
+        task3 = new removeTCASAlerts();
+        timer3 = new Timer();
+        timer3.scheduleAtFixedRate(task3, 14L, RATE3);
 
         process = new Thread(this);
         process.setName("DataBlockParser");
@@ -165,6 +174,7 @@ public final class DataBlockParser extends Thread {
 
         timer1.cancel();
         timer2.cancel();
+        timer3.cancel();
 
         pm.close();
     }
@@ -215,7 +225,8 @@ public final class DataBlockParser extends Thread {
                     + "longitude,"
                     + "verticalRate,"
                     + "verticalTrend,"
-                    + "squawk,alert,"
+                    + "squawk,"
+                    + "alert,"
                     + "emergency,"
                     + "spi,"
                     + "onground,"
@@ -247,7 +258,8 @@ public final class DataBlockParser extends Thread {
                     + "longitude,"
                     + "verticalRate,"
                     + "verticalTrend,"
-                    + "squawk,alert,"
+                    + "squawk,"
+                    + "alert,"
                     + "emergency,"
                     + "spi,"
                     + "onground,"
@@ -361,9 +373,111 @@ public final class DataBlockParser extends Thread {
     }
 
     /*
-     * This will look through the Track table and delete entries that
-     * are over X minutes old.  In that case the target has probably landed
-     * or faded-out from coverage.
+     * Method to add a new TCAS alert for this target
+     * into the database table
+     */
+    public void insertTCASAlert(String hexid, long data56, long time) {
+        String update;
+        int alt16;
+        
+        /*
+         * See if this is even a valid target
+         */
+        if (hasTarget(hexid)) {
+            
+            System.out.println("TCAS Entry %s" + " " + hexid);
+            
+            Track trk = getTarget(hexid);
+            alt16 = trk.getAltitudeDF16();  // might be -9999 (null)
+
+            TCASAlert tcas = new TCASAlert(data56, time, alt16);
+
+            /*
+             * Some TCAS are just advisory, no RA generated
+             * So we keep these off the table, as they are basically junk.
+             * 
+             * Note: TCAS class only sets time if RA is active.
+             */
+            if (tcas.getUpdateTime() == 0L) {
+                return; // No work -- bye
+            }
+            
+            update = String.format("INSERT INTO tcasalerts ("
+                    + "utcupdate,"
+                    + "ttibits,"
+                    + "threatid,"
+                    + "threatrelativealtitude,"
+                    + "altitude,"
+                    + "bearing,"
+                    + "range,"
+                    + "arabits,"
+                    + "racbits,"
+                    + "active_ra,"
+                    + "single_ra,"
+                    + "multiple_ra,"
+                    + "multiplethreats,"
+                    + "threatterminated) VALUES ("
+                    + "'%s',%d,%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
+                    acid,
+                    tcas.getUpdateTime(),
+                    tcas.getThreatTypeIndicator(),
+                    tcas.getThreatICAOID(),
+                    tcas.getThreatRelativeAltitude(),
+                    tcas.getThreatAltitude(),
+                    tcas.getThreatBearing(),
+                    tcas.getThreatRange(),
+                    tcas.getARABits(),
+                    tcas.getRACBits(),
+                    tcas.getActiveRA() ? 1 : 0,
+                    tcas.getSingleRA() ? 1 : 0,
+                    tcas.getMultipleRA() ? 1 : 0,
+                    tcas.getHasMultipleThreats() ? 1 : 0,
+                    tcas.getThreatTerminated() ? 1 : 0);
+
+            try {
+                querytt = db2.createStatement();
+                querytt.executeUpdate(update);
+                querytt.close();
+            } catch (SQLException tt3) {
+                try {
+                    querytt.close();
+                } catch (SQLException tt4) {
+                }
+                System.out.println("DataBlockParser::insertTCASAlert insert SQL Error: " + update + " " + tt3.getMessage());
+            }
+        }
+    }
+
+    /*
+     * This will look through the TCAS database every minute and delete
+     * entries that are over 3 minutes old.  In that case the target has
+     * probably flown out of threat.
+     */
+    private class removeTCASAlerts extends TimerTask {
+        @Override
+        public void run() {
+            long time = zulu.getUTCTime() - (3L * 60L * 1000L);         // subtract 3 minutes
+        
+            String update = String.format("DELETE FROM tcasalerts WHERE utcupdate <= %d", time);
+
+            try {
+                querytt = db2.createStatement();
+                querytt.executeUpdate(update);
+                querytt.close();
+            } catch (SQLException tt3) {
+                try {
+                    querytt.close();
+                } catch (SQLException tt4) {
+                }
+                System.out.println("DataBlockParser::removeTCASAlerts delete SQL Error: " + update + " " + tt3.getMessage());
+            }
+        }
+    }
+
+    /*
+     * This will look through the Track table every 30 seconds and delete
+     * entries that are over X minutes old.  In that case the target has
+     * probably landed or faded-out from coverage.
      */
     private class UpdateReports extends TimerTask {
 
@@ -395,13 +509,6 @@ public final class DataBlockParser extends Thread {
                     }
                 } catch (NullPointerException e2) {
                     // ignore
-                }
-
-                if (id.hasTCASAlerts()) {
-                    /*
-                     * Remove TCAS Alerts older than X minutes
-                     */
-                    id.removeTCAS(currentTime);
                 }
             }
         }
@@ -591,10 +698,10 @@ public final class DataBlockParser extends Thread {
         }
     }
 
-    private void updateTargetSquawk(String hexid, String squawk, long time) {
+    private void updateTargetSquawk(String hexid, String sq, long time) {
         try {
             Track tgt = getTarget(hexid);
-            tgt.setSquawk(squawk);
+            tgt.setSquawk(sq);
             tgt.setUpdatedTime(time);
             addTarget(hexid, tgt);
         } catch (NullPointerException np) {
@@ -643,19 +750,6 @@ public final class DataBlockParser extends Thread {
             tgt.setPosition(latlon, mode, time);
             tgt.setUpdatedTime(time);
             addTarget(hexid, tgt);
-        } catch (NullPointerException np) {
-            System.err.println(np);
-        }
-    }
-
-    private void updateTargetTCASAlert(String hexid, long time, long data56) {
-        try {
-            Track tgt = getTarget(hexid);
-
-            if (hasTarget(hexid)) {
-                tgt.insertTCAS(data56, time);
-                addTarget(hexid, tgt);
-            }
         } catch (NullPointerException np) {
             System.err.println(np);
         }
@@ -745,13 +839,13 @@ public final class DataBlockParser extends Thread {
 
                         try {
                             if (hasTarget(acid)) {
-                                modeA = df05.getSquawk();
+                                squawk = df05.getSquawk();
                                 isOnGround = df05.getIsOnGround();
                                 alert = df05.getIsAlert();
                                 spi = df05.getIsSPI();
                                 emergency = df05.getIsEmergency();
 
-                                updateTargetSquawk(acid, modeA, detectTime);
+                                updateTargetSquawk(acid, squawk, detectTime);
                                 updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
                             }
                         } catch (NullPointerException np) {
@@ -814,7 +908,7 @@ public final class DataBlockParser extends Thread {
                                     data56 = df16.getData56();
 
                                     if (data56 != 30000000000000L) {
-                                        updateTargetTCASAlert(acid, detectTime, data56);
+                                        insertTCASAlert(acid, detectTime, data56);
                                     }
                                 }
                             }
@@ -1069,7 +1163,7 @@ public final class DataBlockParser extends Thread {
                                      * Some planes send Zero's for some damned reason
                                      */
                                     if (data56 != 30000000000000L) {
-                                        updateTargetTCASAlert(acid, detectTime, data56);
+                                        insertTCASAlert(acid, detectTime, data56);
                                     }
                                 }
                             }
@@ -1086,13 +1180,13 @@ public final class DataBlockParser extends Thread {
 
                         try {
                             if (hasTarget(acid)) {
-                                modeA = df21.getSquawk();
+                                squawk = df21.getSquawk();
                                 isOnGround = df21.getIsOnGround();
                                 emergency = df21.getIsEmergency();
                                 alert = df21.getIsAlert();
                                 spi = df21.getIsSPI();
 
-                                updateTargetSquawk(acid, modeA, detectTime);
+                                updateTargetSquawk(acid, squawk, detectTime);
                                 updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
 
                                 int bds = df21.getBDS();
@@ -1108,7 +1202,7 @@ public final class DataBlockParser extends Thread {
                                          * Some planes send Zero's for some damned reason
                                          */
                                         if ((data56 & 0x0FFFFFFFFFFFFFL) != 0) {    // 52-Bits all zero
-                                            updateTargetTCASAlert(acid, detectTime, data56);
+                                            insertTCASAlert(acid, detectTime, data56);
                                         }
                                 }
                             }
