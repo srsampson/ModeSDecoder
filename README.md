@@ -12,6 +12,13 @@ The database is designed so that as new targets come in, their Mode-S ICAO numbe
 
 Currently it only updates the registration (N-Number) for USA aircraft, as they are assigned 1:1, and I don't have any info on other countries. I don't do an Internet lookup, as most sites don't allow it for free.
 
+**Development Environment:**
+
+Apache NetBeans IDE 22   
+Java: 22.0.1; OpenJDK 64-Bit Server VM 22.0.1+8-16   
+Runtime: OpenJDK Runtime Environment 22.0.1+8-16   
+System: Windows 11 version 10.0 running on amd64; UTF-8; en_US (nb)   
+
 ![Sample Query](sample.png)
 ![Sample Query](sample2.png)
 
