@@ -11,6 +11,7 @@ public final class Track implements IConstants {
     private String acid;            // Aircraft ID
     private String registration;    // N-Number if USA registered
     private int mode;               // Track mode
+    private int amplitude;          // last amplitude received
     private int positionMode;
     private int trackQuality;       // 0 - 9 quality value (9 means Firm)
     private int verticalRate;       // fps
@@ -75,6 +76,7 @@ public final class Track implements IConstants {
         registration = "";
         version = 0;
         category = 0;
+        amplitude = 0;
         mode = TRACK_MODE_NORMAL;
         positionMode = POSITION_MODE_UNKNOWN;
         groundSpeed = -999.0f;
@@ -245,6 +247,15 @@ public final class Track implements IConstants {
      */
     public void setUpdatedTime(long val) {
         updatedTime = val;
+    }
+
+    public void setAmplitude(int val) {
+        amplitude = val;
+        updated = true;
+    }
+
+    public int getAmplitude() {
+        return amplitude;
     }
 
     public void setRadarIID(int val) {

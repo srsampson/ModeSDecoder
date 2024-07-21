@@ -22,6 +22,7 @@ public final class TCASAlert {
     private final Altitude alt = new Altitude();
     //
     private long updateTime;
+    private long detectTime;
     /*
      * Threat Type Indicator (TTI)
      */
@@ -83,6 +84,7 @@ public final class TCASAlert {
         threatAltitude = 0;
         threatRelativeAltitude = 0;
         updateTime = 0L;
+        detectTime = time;
 
         threatTerminated = ((data56 & 0x00000020000000L) != 0);
         tti = (int) (((data56 & 0x0000000C000000L) >>> 26) & 0x3);      // Threat Type Indicator
@@ -170,6 +172,15 @@ public final class TCASAlert {
             rac = (int) (((data56 & 0x000003C0000000L) >>> 30) & 0xF);
         }
     }
+    
+    /**
+     * Method to return the time this threat was detected in Zulu time (UTC)
+     *
+     * @return a long representing time in zulu (UTC) threat detected
+     */
+    public long getDetectTime() {
+        return detectTime;
+    }
 
     /**
      * Method to return the time this threat was updated in Zulu time (UTC)
@@ -177,7 +188,7 @@ public final class TCASAlert {
      * <p>
      * The time will be zero (0L) if the activeRA is false
      *
-     * @return a long representing the time in zulu (UTC) this threat was
+     * @return a long representing time in zulu (UTC) threat was
      * updated, or zero if no RA was issued
      */
     public long getUpdateTime() {

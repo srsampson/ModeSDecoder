@@ -79,6 +79,7 @@ public final class DataBlockParser extends Thread {
     private int subtype3;
     private int altitude;
     private int radarIID;
+    private int amplitude;
     //
     private final Timer timer1;
     private final Timer timer2;
@@ -390,6 +391,7 @@ public final class DataBlockParser extends Thread {
             TCASAlert tcas = new TCASAlert(data56, time, alt16);
 
             long utcupdate = tcas.getUpdateTime();
+            long utcdetect = tcas.getDetectTime();
 
             /*
              * Some TCAS are just advisory, no RA generated
@@ -398,6 +400,7 @@ public final class DataBlockParser extends Thread {
             
             update = String.format("INSERT INTO tcasalerts ("
                     + "utcupdate,"
+                    + "utcdetect,"
                     + "ttibits,"
                     + "threatid,"
                     + "threatrelativealtitude,"
@@ -411,9 +414,10 @@ public final class DataBlockParser extends Thread {
                     + "multiple_ra,"
                     + "multiplethreats,"
                     + "threatterminated) VALUES ("
-                    + "'%s',%d,%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
+                    + "'%s',%d,%d,%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
                     acid,
                     utcupdate,
+                    utcdetect,
                     tcas.getThreatTypeIndicator(),
                     tcas.getThreatICAOID(),
                     tcas.getThreatRelativeAltitude(),
@@ -551,6 +555,16 @@ public final class DataBlockParser extends Thread {
         }
     }
 
+    private void updateTargetAmplitude(String hexid, int val, long time) {
+        try {
+            Track tgt = getTarget(hexid);
+            tgt.setAmplitude(val);
+            tgt.setUpdatedTime(time);
+            addTarget(hexid, tgt);
+        } catch (NullPointerException np) {
+            System.err.println(np);
+        }
+    }
     private void updateTargetMagneticHeadingIAS(String hexid, float head, float ias, int vvel, long time) {
         try {
             Track tgt = getTarget(hexid);
@@ -769,7 +783,7 @@ public final class DataBlockParser extends Thread {
 
             for (int i = 0; i < qsize; i++) {
                 dbk = buf.popData();
-
+                amplitude = dbk.getSignalLevel();
                 data = dbk.getData();
                 detectTime = dbk.getUTCTime();
 
@@ -794,6 +808,7 @@ public final class DataBlockParser extends Thread {
                                 altitude = df00.getAltitude();
                                 isOnGround = df00.getIsOnGround();      // true if vs1 == 1
 
+                                updateTargetAmplitude(acid, amplitude, detectTime);
                                 updateTargetAltitudeDF00(acid, altitude, detectTime);
                                 updateTargetOnGround(acid, isOnGround, detectTime);
                             }
@@ -816,6 +831,7 @@ public final class DataBlockParser extends Thread {
                                 spi = df04.getIsSPI();
                                 emergency = df04.getIsEmergency();
 
+                                updateTargetAmplitude(acid, amplitude, detectTime);
                                 updateTargetAltitudeDF04(acid, altitude, detectTime);
                                 updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
                             }
@@ -838,6 +854,7 @@ public final class DataBlockParser extends Thread {
                                 spi = df05.getIsSPI();
                                 emergency = df05.getIsEmergency();
 
+                                updateTargetAmplitude(acid, amplitude, detectTime);
                                 updateTargetSquawk(acid, squawk, detectTime);
                                 updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
                             }
@@ -857,12 +874,11 @@ public final class DataBlockParser extends Thread {
                              * See if Target already exists
                              */
                             try {
-                                if (!hasTarget(acid)) {
+                                if (hasTarget(acid) == false) {
                                     /*
                                      * New Target
                                      */
                                     Track t = new Track(acid, false);  // false == not TIS
-
                                     t.setRegistration(nconverter.icao_to_n(acid));
                                     addTarget(acid, t);
                                 }
@@ -873,6 +889,8 @@ public final class DataBlockParser extends Thread {
                                 System.err.println(np);
                                 break;
                             }
+                            
+                            updateTargetAmplitude(acid, amplitude, detectTime);
 
                             radarIID = df11.getRadarIID();
                             si = df11.getSI();
@@ -891,6 +909,7 @@ public final class DataBlockParser extends Thread {
                                 isOnGround = df16.getIsOnGround();
                                 altitude = df16.getAltitude();
 
+                                updateTargetAmplitude(acid, amplitude, detectTime);
                                 updateTargetAltitudeDF16(acid, altitude, detectTime);
                                 updateTargetOnGround(acid, isOnGround, detectTime);
 
@@ -916,7 +935,7 @@ public final class DataBlockParser extends Thread {
                         DownlinkFormat17 df17 = new DownlinkFormat17(data, detectTime, pm);
                         acid = df17.getACID();
 
-                        if (df17.isValid() == true) {
+                        if (df17.isValid() == true) { // CRC passed
                             /*
                              * See if Target already exists
                              */
@@ -926,7 +945,6 @@ public final class DataBlockParser extends Thread {
                                      * New Target
                                      */
                                     Track t = new Track(acid, false);  // false == not TIS
-
                                     t.setRegistration(nconverter.icao_to_n(acid));
                                     addTarget(acid, t);
                                 }
@@ -937,95 +955,97 @@ public final class DataBlockParser extends Thread {
                                 System.err.println(np);
                                 break;
                             }
-                        }
 
-                        switch (df17.getFormatType()) {
-                            case 0:
-                                // No position information (may have baro alt)
-                                break;
-                            case 1: // Cat D
-                            case 2: // Cat C
-                            case 3: // Cat B
-                            case 4: // Cat A
+                            updateTargetAmplitude(acid, amplitude, detectTime);
 
-                                // Identification and Category Type
-                                category = df17.getCategory();
-                                callsign = df17.getCallsign();
+                            switch (df17.getFormatType()) {
+                                case 0:
+                                    // No position information (may have baro alt)
+                                    break;
+                                case 1: // Cat D
+                                case 2: // Cat C
+                                case 3: // Cat B
+                                case 4: // Cat A
 
-                                updateTargetCallsign(acid, callsign, category, detectTime);
-                                break;
-                            case 5:
-                            case 6:
-                            case 7:
-                            case 8:
-                                // Surface Position
+                                    // Identification and Category Type
+                                    category = df17.getCategory();
+                                    callsign = df17.getCallsign();
 
-                                isOnGround = df17.getIsOnGround();
-                                emergency = df17.getIsEmergency();
-                                alert = df17.getIsAlert();
-                                spi = df17.getIsSPI();
+                                    updateTargetCallsign(acid, callsign, category, detectTime);
+                                    break;
+                                case 5:
+                                case 6:
+                                case 7:
+                                case 8:
+                                    // Surface Position
 
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-                                break;
-                            case 9:
-                            case 10:
-                            case 11:
-                            case 12:
-                            case 13:
-                            case 14:
-                            case 15:
-                            case 16:
-                            case 17:
-                            case 18:
-                                // Airborne Position with barometric altitude
-                                isOnGround = df17.getIsOnGround();
-                                emergency = df17.getIsEmergency();
-                                alert = df17.getIsAlert();
-                                spi = df17.getIsSPI();
+                                    isOnGround = df17.getIsOnGround();
+                                    emergency = df17.getIsEmergency();
+                                    alert = df17.getIsAlert();
+                                    spi = df17.getIsSPI();
 
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
+                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
+                                    break;
+                                case 9:
+                                case 10:
+                                case 11:
+                                case 12:
+                                case 13:
+                                case 14:
+                                case 15:
+                                case 16:
+                                case 17:
+                                case 18:
+                                    // Airborne Position with barometric altitude
+                                    isOnGround = df17.getIsOnGround();
+                                    emergency = df17.getIsEmergency();
+                                    alert = df17.getIsAlert();
+                                    spi = df17.getIsSPI();
 
-                                altitude = df17.getAltitude();
-                                updateTargetAltitudeDF17(acid, altitude, detectTime);
+                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
 
-                                break;
-                            case 19:
-                                subtype3 = df17.getSubType();
+                                    altitude = df17.getAltitude();
+                                    updateTargetAltitudeDF17(acid, altitude, detectTime);
 
-                                switch (subtype3) {
-                                    case 1:     // gndspeed normal lsb=1knot
-                                    case 2:     // gndspeed supersonic lsb=4knots
-                                        groundSpeed = df17.getGroundSpeed();
-                                        trueHeading = df17.getTrueHeading();
-                                        vSpeed = df17.getVspeed();
+                                    break;
+                                case 19:
+                                    subtype3 = df17.getSubType();
 
-                                        if (trueHeading != -1.0) {
-                                            updateTargetGroundSpeedTrueHeading(acid, groundSpeed, trueHeading, vSpeed, detectTime);
-                                        }
-                                        break;
-                                    case 3: // subsonic
-                                    case 4: // supersonic
-
-                                        // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
-                                        if (df17.getMagneticFlag()) {
-                                            magneticHeading = df17.getMagneticHeading();
-                                            airspeed = df17.getAirspeed();
+                                    switch (subtype3) {
+                                        case 1:     // gndspeed normal lsb=1knot
+                                        case 2:     // gndspeed supersonic lsb=4knots
+                                            groundSpeed = df17.getGroundSpeed();
+                                            trueHeading = df17.getTrueHeading();
                                             vSpeed = df17.getVspeed();
 
-                                            if (df17.getTasFlag() == false) {
-                                                updateTargetMagneticHeadingIAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
-                                            } else {
-                                                updateTargetMagneticHeadingTAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                            if (trueHeading != -1.0) {
+                                                updateTargetGroundSpeedTrueHeading(acid, groundSpeed, trueHeading, vSpeed, detectTime);
                                             }
-                                        }
-                                }
+                                            break;
+                                        case 3: // subsonic
+                                        case 4: // supersonic
+
+                                            // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
+                                            if (df17.getMagneticFlag()) {
+                                                magneticHeading = df17.getMagneticHeading();
+                                                airspeed = df17.getAirspeed();
+                                                vSpeed = df17.getVspeed();
+
+                                                if (df17.getTasFlag() == false) {
+                                                    updateTargetMagneticHeadingIAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                                } else {
+                                                    updateTargetMagneticHeadingTAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                                }
+                                            }
+                                    }
+                            }
                         }
                         break;
                     case 18:
                         DownlinkFormat18 df18 = new DownlinkFormat18(data, detectTime, pm);
                         acid = df18.getACID();
 
-                        if (df18.isValid() == true) {
+                        if (df18.isValid() == true) { // Passed CRC
                             /*
                              * See if Target already exists
                              */
@@ -1045,87 +1065,89 @@ public final class DataBlockParser extends Thread {
                                  */
                                 System.err.println(np);
                             }
-                        }
 
-                        switch (df18.getFormatType()) {
-                            case 0:
-                                // No position information (may have baro alt)
-                                break;
-                            case 1: // Cat D
-                            case 2: // Cat C
-                            case 3: // Cat B
-                            case 4: // Cat A
+                            updateTargetAmplitude(acid, amplitude, detectTime);
+                            
+                            switch (df18.getFormatType()) {
+                                case 0:
+                                    // No position information (may have baro alt)
+                                    break;
+                                case 1: // Cat D
+                                case 2: // Cat C
+                                case 3: // Cat B
+                                case 4: // Cat A
 
-                                // Identification and Category Type
-                                category = df18.getCategory();
-                                callsign = df18.getCallsign();
+                                    // Identification and Category Type
+                                    category = df18.getCategory();
+                                    callsign = df18.getCallsign();
 
-                                updateTargetCallsign(acid, callsign, category, detectTime);
-                                break;
-                            case 5:
-                            case 6:
-                            case 7:
-                            case 8:
-                                // Surface Position
+                                    updateTargetCallsign(acid, callsign, category, detectTime);
+                                    break;
+                                case 5:
+                                case 6:
+                                case 7:
+                                case 8:
+                                    // Surface Position
 
-                                isOnGround = df18.getIsOnGround();
-                                emergency = df18.getIsEmergency();
-                                alert = df18.getIsAlert();
-                                spi = df18.getIsSPI();
+                                    isOnGround = df18.getIsOnGround();
+                                    emergency = df18.getIsEmergency();
+                                    alert = df18.getIsAlert();
+                                    spi = df18.getIsSPI();
 
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-                                break;
-                            case 9:
-                            case 10:
-                            case 11:
-                            case 12:
-                            case 13:
-                            case 14:
-                            case 15:
-                            case 16:
-                            case 17:
-                            case 18:
-                                // Airborne Position with barometric altitude
-                                isOnGround = df18.getIsOnGround();
-                                emergency = df18.getIsEmergency();
-                                alert = df18.getIsAlert();
-                                spi = df18.getIsSPI();
+                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
+                                    break;
+                                case 9:
+                                case 10:
+                                case 11:
+                                case 12:
+                                case 13:
+                                case 14:
+                                case 15:
+                                case 16:
+                                case 17:
+                                case 18:
+                                    // Airborne Position with barometric altitude
+                                    isOnGround = df18.getIsOnGround();
+                                    emergency = df18.getIsEmergency();
+                                    alert = df18.getIsAlert();
+                                    spi = df18.getIsSPI();
 
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
+                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
 
-                                altitude = df18.getAltitude();
-                                updateTargetAltitudeDF18(acid, altitude, detectTime);
-                                break;
-                            case 19:
-                                subtype3 = df18.getSubType();
+                                    altitude = df18.getAltitude();
+                                    updateTargetAltitudeDF18(acid, altitude, detectTime);
+                                    break;
+                                case 19:
+                                    subtype3 = df18.getSubType();
 
-                                switch (subtype3) {
-                                    case 1:     // gndspeed normal lsb=1knot
-                                    case 2:     // gndspeed supersonic lsb=4knots
-                                        groundSpeed = df18.getGroundSpeed();
-                                        trueHeading = df18.getTrueHeading();
-                                        vSpeed = df18.getVspeed();
-
-                                        if (!(Float.compare(trueHeading, -1.0f) == 0)) {
-                                            updateTargetGroundSpeedTrueHeading(acid, groundSpeed, trueHeading, vSpeed, detectTime);
-                                        }
-                                        break;
-                                    case 3: // subsonic
-                                    case 4: // supersonic
-
-                                        // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
-                                        if (df18.getMagneticFlag()) {
-                                            magneticHeading = df18.getMagneticHeading();
-                                            airspeed = df18.getAirspeed();
+                                    switch (subtype3) {
+                                        case 1:     // gndspeed normal lsb=1knot
+                                        case 2:     // gndspeed supersonic lsb=4knots
+                                            groundSpeed = df18.getGroundSpeed();
+                                            trueHeading = df18.getTrueHeading();
                                             vSpeed = df18.getVspeed();
 
-                                            if (df18.getTasFlag() == false) {
-                                                updateTargetMagneticHeadingIAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
-                                            } else {
-                                                updateTargetMagneticHeadingTAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                            if (!(Float.compare(trueHeading, -1.0f) == 0)) {
+                                                updateTargetGroundSpeedTrueHeading(acid, groundSpeed, trueHeading, vSpeed, detectTime);
                                             }
-                                        }
-                                }
+                                            break;
+                                        case 3: // subsonic
+                                        case 4: // supersonic
+
+                                            // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
+                                            if (df18.getMagneticFlag()) {
+                                                magneticHeading = df18.getMagneticHeading();
+                                                airspeed = df18.getAirspeed();
+                                                vSpeed = df18.getVspeed();
+
+                                                if (df18.getTasFlag() == false) {
+                                                    updateTargetMagneticHeadingIAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                                } else {
+                                                    updateTargetMagneticHeadingTAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                                }
+                                            }
+                                    }
+                            }
                         }
                         break;
                     case 19: // Military Squitter
@@ -1142,6 +1164,7 @@ public final class DataBlockParser extends Thread {
                                 alert = df20.getIsAlert();
                                 spi = df20.getIsSPI();
 
+                                updateTargetAmplitude(acid, amplitude, detectTime);
                                 updateTargetAltitudeDF20(acid, altitude, detectTime);
                                 updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
 
@@ -1179,6 +1202,7 @@ public final class DataBlockParser extends Thread {
                                 alert = df21.getIsAlert();
                                 spi = df21.getIsSPI();
 
+                                updateTargetAmplitude(acid, amplitude, detectTime);
                                 updateTargetSquawk(acid, squawk, detectTime);
                                 updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
 
@@ -1263,6 +1287,7 @@ public final class DataBlockParser extends Thread {
 
                         if (exists > 0) {         // target exists
                             queryString = String.format("UPDATE target SET utcupdate=%d,"
+                                    + "amplitude=%d,"
                                     + "radariid=NULLIF(%d, -99),"
                                     + "si=%d,"
                                     + "altitude=NULLIF(%d, -9999),"
@@ -1294,6 +1319,7 @@ public final class DataBlockParser extends Thread {
                                     + "hadSPI=%d"
                                     + " WHERE acid='%s' AND radar_id=%d",
                                     time,
+                                    trk.getAmplitude(),
                                     trk.getRadarIID(),
                                     trk.getSI() ? 1 : 0,
                                     trk.getAltitude(),
@@ -1331,6 +1357,7 @@ public final class DataBlockParser extends Thread {
                                     + "radar_id,"
                                     + "utcdetect,"
                                     + "utcupdate,"
+                                    + "amplitude,"
                                     + "radariid,"
                                     + "si,"
                                     + "altitude,"
@@ -1360,7 +1387,7 @@ public final class DataBlockParser extends Thread {
                                     + "hadAlert,"
                                     + "hadEmergency,"
                                     + "hadSPI) "
-                                    + "VALUES ('%s',%d,%d,%d,"
+                                    + "VALUES ('%s',%d,%d,%d,%d,"
                                     + "NULLIF(%d, -99), %d," // radarIID & SI
                                     + "NULLIF(%d, -9999),"
                                     + "NULLIF(%d, -9999),"
@@ -1385,6 +1412,7 @@ public final class DataBlockParser extends Thread {
                                     radarid,
                                     time,
                                     time,
+                                    trk.getAmplitude(),
                                     trk.getRadarIID(),
                                     trk.getSI() ? 1 : 0,
                                     trk.getAltitude(),
@@ -1436,6 +1464,7 @@ public final class DataBlockParser extends Thread {
                                         + "radar_id,"
                                         + "acid,"
                                         + "utcdetect,"
+                                        + "amplitude,"
                                         + "radariid,"
                                         + "si,"
                                         + "latitude,"
@@ -1448,6 +1477,7 @@ public final class DataBlockParser extends Thread {
                                         + "%d,"
                                         + "'%s',"
                                         + "%d,"
+                                        + "%d,"     // amplitude
                                         + "%d, %d," // radariid & si
                                         + "%f,"
                                         + "%f,"
@@ -1459,6 +1489,7 @@ public final class DataBlockParser extends Thread {
                                         radarid,
                                         acid,
                                         time,
+                                        trk.getAmplitude(),
                                         trk.getRadarIID(),
                                         trk.getSI() ? 1 : 0,
                                         trk.getLatitude(),

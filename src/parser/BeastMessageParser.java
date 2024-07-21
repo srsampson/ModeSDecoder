@@ -8,12 +8,9 @@ import java.util.List;
 import java.util.LinkedList;
 
 /*
- * This is used to process Mode-S Beast binary data that is available on a serial
- * port. The parse() method is used to read the generated list of Mode-S packets
- * to be processed.
+ * This is used to parse the Mode-S Beast binary data.
  *
- * Binary Format (DIP#3 in "ON" position) There are only three frame formats in
- * the binary protocol:
+ * There are only three frame formats in the binary protocol:
  *
  * <esc> "1" : 6 byte MLAT counter, 1 byte signal level, 2 byte Mode-AC
  * <esc> "2" : 6 byte MLAT counter, 1 byte signal level, 7 byte Mode-S short frame
@@ -21,9 +18,7 @@ import java.util.LinkedList;
  *
  * (<esc><esc>: true 0x1A
  *
- * <esc> is 0x1A, and "1", "2" and "3" are 0x31, 0x32 and 0x33
- *
- * When binary format is selected, DIP#5 (MLAT timer) is ignored (turn it on anyway).
+ * <esc> is 0x1A, and "1", "2" and "3" are 0x31, 0x32 and 0x33 ASCII
  */
 public final class BeastMessageParser {
 
@@ -32,27 +27,30 @@ public final class BeastMessageParser {
     private static final byte SHORT = 0x32;
     private static final byte LONG = 0x33;
     //
-    private static final int MAXBUFFERSIZE = 10000;
+    private static final int MAXBUFFERSIZE = 10000; // some big number
 
     private final class ExtractResult {
 
-        int endOfPacket;
-        int startOfPacket;
-        int dataLength;
         int signalLevel;
+        int startOfPacket;
+        int endOfPacket;
+        int dataLength;
 
-        ExtractResult(int ep, int sp, int dl, int sl) {
-            endOfPacket = ep;
-            startOfPacket = sp;
-            dataLength = dl;
+        ExtractResult(int sl, int sp, int ep, int dl) {
             signalLevel = sl;
+            startOfPacket = sp;
+            endOfPacket = ep;
+            dataLength = dl;
+
         }
     }
 
     private byte[] readBuffer;
     private int readBufferLength;
+    //
     private byte[] payload;
     private byte[] mlatBytes;
+    //
     private boolean sawFirstPacket;
 
     public BeastMessageParser() {
@@ -91,7 +89,7 @@ public final class BeastMessageParser {
 
         int startOfPacket = findStartIndex(0);
 
-        if (!sawFirstPacket && startOfPacket == 1) {
+        if ((sawFirstPacket == false) && startOfPacket == 1) {
             startOfPacket = findStartIndex(startOfPacket);
         }
 
@@ -225,6 +223,6 @@ public final class BeastMessageParser {
 
         int endOfPacket = (di != dataLength) ? -1 : si;
 
-        return new ExtractResult(endOfPacket, startOfPacket, dataLength, signalLevel);
+        return new ExtractResult(signalLevel, startOfPacket, endOfPacket, dataLength);
     }
 }

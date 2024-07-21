@@ -136,6 +136,8 @@ public final class ModeSDecoder {
      * SW8  = CLOSED (Hardware Handshake)          h | H*
      * SW9  = CLOSED (FEC Off)                     i | I*
      * SW10 = OPEN (No Mode-A/C)                   j*| J
+     *
+     * When binary format is selected, SW5 (MLAT Counter) is ignored (close it anyway).
      */
     private static boolean beastSetup() {
         byte[] optionsmsg = new byte[] {0x1a, 0x31, 0x00}; // Escape, '1', n
