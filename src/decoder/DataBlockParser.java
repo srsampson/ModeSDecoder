@@ -8,6 +8,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -391,7 +392,7 @@ public final class DataBlockParser extends Thread {
             TCASAlert tcas = new TCASAlert(data56, time, alt16);
 
             long utcupdate = tcas.getUpdateTime();
-            long utcdetect = tcas.getDetectTime();
+            Timestamp utcdetect = new Timestamp(tcas.getDetectTime());
 
             /*
              * Some TCAS are just advisory, no RA generated
@@ -414,10 +415,10 @@ public final class DataBlockParser extends Thread {
                     + "multiple_ra,"
                     + "multiplethreats,"
                     + "threatterminated) VALUES ("
-                    + "'%s',%d,%d,%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
+                    + "'%s',%d,%s,%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
                     acid,
                     utcupdate,
-                    utcdetect,
+                    utcdetect.toString(),
                     tcas.getThreatTypeIndicator(),
                     tcas.getThreatICAOID(),
                     tcas.getThreatRelativeAltitude(),
