@@ -36,7 +36,7 @@ public final class DownlinkFormat18 implements IDF18 {
     //
     private String callsign;
     private String vspeedSource;
-    private final String acid;
+    private String acid;
     //
     private boolean singleAntenna;
     private boolean timeSync;
@@ -72,6 +72,10 @@ public final class DownlinkFormat18 implements IDF18 {
         crc = new CRC();
         thead = new TrueHeading();
         call = new Callsign();
+
+        acid = "";
+        callsign = "";
+        altitude = -9999;
 
         pm = p;
         timestamp = time;

@@ -5,13 +5,6 @@
  * It reads the Serial Port data and combines data into targets.
  * The targets are then stored and updated in a MySQL Database.
  *
- * My thanks to Kinetic Avionic UK, who got us all started in
- * the hobby with their SBS-1, which was a fantastic kit
- * with its FPGA decoder.
- *
- * My thanks also to Jetvision and Günter Köllner for his
- * fantastic FPGA based 1090 receiver called the Mode-S Beast.
- *
  * Public Domain (p) 2024 Steve Sampson, K5OKC
  */
 package parser;
@@ -42,7 +35,7 @@ public final class ModeSDecoder {
 
     public static void main(String[] args) {
         /*
-         * The user may have a commandline option for config file.
+         * Check for commandline options
          */
         try {
             if (args[0].equals("-c") || args[0].equals("/c")) {
@@ -56,10 +49,10 @@ public final class ModeSDecoder {
         config = new Config(configFile);
 
         /*
-         * Create a buffer between Serial and ProcessData
+         * Create a pipe between Serial and ProcessData threads
          *
          * I tried using a BufferedReader but couldn't get it to
-         * work with the jSerialComm library.
+         * work with the jSerialComm library
          */
         try {
             beast_input = new PipedInputStream(4096);
@@ -71,27 +64,6 @@ public final class ModeSDecoder {
         }
         
         /*
-         * Note: The Switches on the Beast are
-         * a real bitch. They are so small that you
-         * need a magnifying glass and a sharp stick.
-         *
-         * But you can also send the switch config settings
-         * using the serial port (Except for Baud Rate).
-         *
-         * Toward the LEDS = OPEN
-         * AWAY from the LEDS = CLOSED
-         *
-         * SW1, SW2 = OPEN (Normal Baud Rate)
-         *
-         * SW3 = CLOSED (Binary Format)                c,C option
-         * SW4 = OPEN (All DF Decoded)                 d,D
-         * SW5 = CLOSED (MLAT Counter Enabled)         e,E
-         * SW6 = OPEN (CRC on DF-11, DF-17, DF-18)     f,F
-         * SW7 = OPEN (DF-0/DF-4/DF-5 filter Off)      g,G
-         * SW8 = CLOSED (Hardware Handshake)           h,H
-         * SW9 = CLOSED (FEC Off)                      i,I
-         * SW10 = OPEN (No Mode-A/C)                   j,J
-         *
          * Connect to the Serial Communications Port
          */
         port = SerialPort.getCommPort(config.getCommPort());
@@ -113,13 +85,22 @@ public final class ModeSDecoder {
             System.exit(0);
         }
 
-        /*
-         * Setup the Beast modes the way I like it (recommended by JetVision)
-         */
-        beastSetup();
-
         comm_input = port.getInputStream();
 
+        /*
+         * Command the Beast switches
+         */        
+        if (beastSetup() == false) {
+            System.err.printf("Fatal: Beast Switch Command Failed\n");
+            System.exit(0);
+        } else {
+            System.out.println("Mode-S Beast Switches Configured");
+        }
+
+        /*
+         * The receiver location should be high resolution (6 digits).
+         * It is used by the position determining algorithms.
+         */
         receiverLatLon = new LatLon(config.getStationLatitude(), config.getStationLongitude());
 
         recv = new SerialPipe(comm_input, beast_output);   // grab Beast data and buffer between threads
@@ -129,65 +110,46 @@ public final class ModeSDecoder {
         Shutdown sh = new Shutdown(port, comm_input, recv, bufferData, parser);
         Runtime.getRuntime().addShutdownHook(sh);
 
+        /*
+         * Start me up...
+         *      ...and never stop
+         */
         recv.start();
         bufferData.start();
         parser.start();
     }
-    
+
     /*
-     * Amateur Hour here, just git-er-done...
+     * Send the configuration switch settings
+     * (Except for Baud Rate)
+     *
+     * Toward the LEDS = OPEN
+     * AWAY from the LEDS = CLOSED
+     *
+     * SW1, SW2 = OPEN (Normal Baud Rate)
+     *                                          Open | Closed
+     * SW3  = CLOSED (Binary Format)               c | C*
+     * SW4  = OPEN (All DF Decoded)                d*| D
+     * SW5  = CLOSED (MLAT Counter Enabled)        e | E*
+     * SW6  = OPEN (CRC on DF-11, DF-17, DF-18)    f*| F
+     * SW7  = OPEN (DF-0/DF-4/DF-5 filter Off)     g*| G
+     * SW8  = CLOSED (Hardware Handshake)          h | H*
+     * SW9  = CLOSED (FEC Off)                     i | I*
+     * SW10 = OPEN (No Mode-A/C)                   j*| J
      */
-    private static void beastSetup() {
-        byte[] optionsmsg = new byte[3];
-        boolean error = false;
+    private static boolean beastSetup() {
+        byte[] optionsmsg = new byte[] {0x1a, 0x31, 0x00}; // Escape, '1', n
+        String options = "CdEfgHIj";
+        boolean good = true;
 
-        optionsmsg[0] = 0x1a;   // Escape
-        optionsmsg[1] = 0x31;   // '1'
-        optionsmsg[2] = 'C';    // binary mode command
-
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
+        for (int i = 0; i < options.length(); i++) {
+            optionsmsg[2] = (byte) options.charAt(i);
+            
+            if (port.writeBytes(optionsmsg, 3) != 3) {
+                good = false;
+            }
         }
 
-        optionsmsg[2] = 'd';  // Pass All DF
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
-        }
-        
-        optionsmsg[2] = 'E';  // MLAT enabled
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
-        }
-        
-        optionsmsg[2] = 'f';  // CRC off
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
-        }
-        
-        optionsmsg[2] = 'g';  // DF0,4,5 Filter off
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
-        }
-        
-        optionsmsg[2] = 'H';  // Hardware handshake
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
-        }
-        
-        optionsmsg[2] = 'I';  // FEC off
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
-        }
-        
-        optionsmsg[2] = 'J';  // No Mode-A/C
-        if (port.writeBytes(optionsmsg, 3) != 3) {
-            error = true;
-        }
-        
-        if (error == true) {
-            System.out.printf("Beast Switch Command %c Failed\n", (char) optionsmsg[2]);
-        } else {
-            System.out.println("Mode-S Beast Switches Configured");
-        }
+        return good;
     }
 }

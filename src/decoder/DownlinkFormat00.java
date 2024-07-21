@@ -12,10 +12,10 @@ public final class DownlinkFormat00 implements IDF00 {
 
     private final CRC crc;
     private final Altitude alt;
-    private final int altitude;
+    private int altitude;
     private final int ri4;
     private final long timestamp;
-    private final String acid;
+    private String acid;
     private boolean crosslinkCapable;
     private final boolean isOnGround;
     private final boolean cc1;
@@ -31,6 +31,9 @@ public final class DownlinkFormat00 implements IDF00 {
         alt = new Altitude();
 
         timestamp = time;
+        acid = "";
+        altitude = -9999;
+
         altitude = alt.decodeAltitude(raw56.substring(0, 8), true);    // true == has the Metre Bit
 
         /*

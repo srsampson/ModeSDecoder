@@ -42,7 +42,11 @@ public final class DownlinkFormat21 implements IDF21 {
         call = new Callsign();
         dataBytes = new int[7];
 
+
         timestamp = time;
+        squawk = "";    // just in case decode fails
+        acid = "";
+
         squawk = sqk.decodeSquawk(raw112.substring(0, 8));
 
         /*

@@ -41,6 +41,9 @@ public final class DownlinkFormat20 implements IDF20 {
         crc = new CRC();
         call = new Callsign();
         dataBytes = new int[7];
+        acid = "";
+        callsign = "";
+        altitude = -9999;
 
         timestamp = time;
         altitude = alt.decodeAltitude(raw112.substring(0, 8), true);    // true ==  has Metre bit

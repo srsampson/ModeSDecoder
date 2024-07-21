@@ -38,7 +38,7 @@ public final class Squawk implements ISquawk {
          */
         try {
             squawk = String.format("%d%d%d%d", a, b, c, d);
-        } catch (IllegalFormatException e) {
+        } catch (Exception e) {
             squawk = "";
         }
         

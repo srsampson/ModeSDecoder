@@ -35,7 +35,7 @@ public final class DownlinkFormat17 implements IDF17 {
     //
     private String callsign;
     private String vspeedSource;
-    private final String acid;
+    private String acid;
     //
     private boolean singleAntenna;
     private boolean timeSync;
@@ -74,7 +74,9 @@ public final class DownlinkFormat17 implements IDF17 {
 
         pm = p;
         timestamp = time;
+        acid = "";
         callsign = "";
+        altitude = -9999;
 
         /*
          * By running the first 88 bits into the CRC, and then XOR the last 24

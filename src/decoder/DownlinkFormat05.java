@@ -36,6 +36,9 @@ public final class DownlinkFormat05 implements IDF05 {
         sqk = new Squawk();
 
         timestamp = time;
+        acid = "";
+        squawk = "";
+
         squawk = sqk.decodeSquawk(raw56.substring(0, 8));
 
         /*

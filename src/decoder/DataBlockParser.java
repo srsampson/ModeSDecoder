@@ -28,7 +28,7 @@ public final class DataBlockParser extends Thread {
 
     private static final long RATE1 = 30L * 1000L;              // 30 seconds
     private static final long RATE2 = 5L * 1000L;               // 5 seconds
-    private static final long RATE3 = 60L * 1000L;         // 1 minute
+    private static final long RATE3 = 10L * 60L * 1000L;        // 10 minutes
     //
     private final ConcurrentHashMap<String, Track> targets;
     //
@@ -384,23 +384,17 @@ public final class DataBlockParser extends Thread {
          * See if this is even a valid target
          */
         if (hasTarget(hexid)) {
-            
-            System.out.println("TCAS Entry %s" + " " + hexid);
-            
             Track trk = getTarget(hexid);
             alt16 = trk.getAltitudeDF16();  // might be -9999 (null)
 
             TCASAlert tcas = new TCASAlert(data56, time, alt16);
 
+            long utcupdate = tcas.getUpdateTime();
+
             /*
              * Some TCAS are just advisory, no RA generated
-             * So we keep these off the table, as they are basically junk.
-             * 
-             * Note: TCAS class only sets time if RA is active.
+             * Note: TCASAlert class only sets time if RA is active.
              */
-            if (tcas.getUpdateTime() == 0L) {
-                return; // No work -- bye
-            }
             
             update = String.format("INSERT INTO tcasalerts ("
                     + "utcupdate,"
@@ -419,7 +413,7 @@ public final class DataBlockParser extends Thread {
                     + "threatterminated) VALUES ("
                     + "'%s',%d,%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
                     acid,
-                    tcas.getUpdateTime(),
+                    utcupdate,
                     tcas.getThreatTypeIndicator(),
                     tcas.getThreatICAOID(),
                     tcas.getThreatRelativeAltitude(),
@@ -449,14 +443,13 @@ public final class DataBlockParser extends Thread {
     }
 
     /*
-     * This will look through the TCAS database every minute and delete
-     * entries that are over 3 minutes old.  In that case the target has
-     * probably flown out of threat.
+     * This will look through the TCAS database every 10 minutes and delete
+     * entries that are over 30 minutes old. This is so I can view it manually.
      */
     private class removeTCASAlerts extends TimerTask {
         @Override
         public void run() {
-            long time = zulu.getUTCTime() - (3L * 60L * 1000L);         // subtract 3 minutes
+            long time = zulu.getUTCTime() - (30L * 60L * 1000L); // subtract 30 minutes
         
             String update = String.format("DELETE FROM tcasalerts WHERE utcupdate <= %d", time);
 

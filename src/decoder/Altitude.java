@@ -56,7 +56,7 @@ public final class Altitude {
             }
         } catch (IndexOutOfBoundsException | NumberFormatException e) {
             System.out.printf("Altitude::decodeAltitude exception [%s], %s%n", raw32, e.getMessage());
-            return 0;
+            return -9999;       // return null
         }
 
         return altitude;

@@ -16,7 +16,7 @@ public final class DownlinkFormat11 implements IDF11 {
     private int cl3;
     private final int ca3;
     private final String raw56;
-    private final String acid;
+    private String acid;
     private final String crcValue;
     private final long timestamp;
     private boolean isSIcode;
@@ -34,6 +34,7 @@ public final class DownlinkFormat11 implements IDF11 {
         raw56 = raw;
         timestamp = time;
         isSIcode = false;
+        acid = "";
 
         /*
          * First we determine if this is a broadcast squitter from an aircraft,
