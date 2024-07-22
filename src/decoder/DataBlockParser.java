@@ -395,6 +395,7 @@ public final class DataBlockParser extends Thread {
              */
             
             String update = String.format("INSERT INTO tcasalerts ("
+                    + "acid,"
                     + "utcupdate,"
                     + "utcdetect,"
                     + "ttibits,"
@@ -410,7 +411,7 @@ public final class DataBlockParser extends Thread {
                     + "multiple_ra,"
                     + "multiplethreats,"
                     + "threatterminated) VALUES ("
-                    + "'%s',%d,%s,%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
+                    + "'%s',%d,'%s',%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
                     acid,
                     utcupdate,
                     utcdetect.toString(),
@@ -1554,7 +1555,7 @@ public final class DataBlockParser extends Thread {
                                         + "'%s',"
                                         + "%d,"
                                         + "%d,"     // amplitude
-                                        + "%d, %d," // radariid & si
+                                        + "NULLIF(%d, -99), %d," // radariid & si
                                         + "%f,"
                                         + "%f,"
                                         + "%d,"
