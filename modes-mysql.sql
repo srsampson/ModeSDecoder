@@ -163,7 +163,7 @@ CREATE TABLE `targetecho` (
   `acid` char(6) NOT NULL COMMENT 'Aircraft ID',
   `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC Time detected',
   `amplitude` int DEFAULT NULL COMMENT 'Receiver Amplitude',
-  `radariid` int NOT NULL,
+  `radariid` int DEFAULT NULL,
   `si` tinyint(1) NOT NULL DEFAULT '0',
   `latitude` float NOT NULL COMMENT 'latitude in degrees',
   `longitude` float NOT NULL COMMENT 'longitude in degrees',
