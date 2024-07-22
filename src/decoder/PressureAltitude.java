@@ -102,8 +102,14 @@ public class PressureAltitude {
                 noaa = new URI(NOAA + URL + airportName + ".TXT").toURL();
                 in = new BufferedReader(new InputStreamReader(noaa.openStream()));
             } catch (IOException | URISyntaxException e1) {
-                System.out.println("PressureAltitude::run fatal: NOAA Metar URL error " + noaa.toString());
-                System.exit(0);
+                airportDataValid = false;
+                
+                try {
+                    in.close();
+                } catch (IOException e3) {
+                }
+                
+                return; // network down
             }
 
             do {
@@ -156,6 +162,8 @@ public class PressureAltitude {
 //                        + altitudeCorrection
 //                        + " As of "
 //                        + observationUTCTime);
+            } else {
+                airportDataValid = false;
             }
         }
     }

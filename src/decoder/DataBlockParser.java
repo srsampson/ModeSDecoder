@@ -149,7 +149,7 @@ public final class DataBlockParser extends Thread {
         
         task3 = new removeTCASAlerts();
         timer3 = new Timer();
-        //timer3.scheduleAtFixedRate(task3, 14L, RATE3);
+        timer3.scheduleAtFixedRate(task3, 14L, RATE3);
 
         process = new Thread(this);
         process.setName("DataBlockParser");
