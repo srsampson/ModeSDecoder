@@ -21,7 +21,6 @@ public final class TCASAlert {
     private int threatIdentityData;
     private int threatTypeData;
     //
-    private long updateTime;
     private long detectTime;
     /*
      * Threat Type Indicator (TTI)
@@ -87,7 +86,6 @@ public final class TCASAlert {
         threatBearing = -999.0f;
         threatAltitude = -9999;
         threatRelativeAltitude = -9999;
-        updateTime = 0L;
         detectTime = time;
 
         // These fit into an Integer in Java
@@ -164,11 +162,6 @@ public final class TCASAlert {
             }
 
             /*
-             * Only set the time if RA active
-             */
-            updateTime = time;
-
-            /*
              * Decode the ARA 14 bits (6 usable, rest are for ACAS III)
              * Bit 9 is used to signify singleRA
              */
@@ -188,19 +181,6 @@ public final class TCASAlert {
      */
     public long getDetectTime() {
         return detectTime;
-    }
-
-    /**
-     * Method to return the time this threat was updated in Zulu time (UTC)
-     *
-     * <p>
-     * The time will be zero (0L) if the activeRA is false
-     *
-     * @return a long representing time in zulu (UTC) threat was
-     * updated, or zero if no RA was issued
-     */
-    public long getUpdateTime() {
-        return updateTime;
     }
 
     /**
@@ -447,5 +427,13 @@ public final class TCASAlert {
      */
     public int getThreatRelativeAltitude() {
         return threatRelativeAltitude;
+    }
+    
+    public String getThreatIdentityData() {
+        return Integer.toString(threatIdentityData, 16);
+    }
+    
+    public String getThreatTypeData() {
+        return Integer.toString(threatTypeData, 16);
     }
 }

@@ -387,7 +387,6 @@ public final class DataBlockParser extends Thread {
 
             TCASAlert tcas = new TCASAlert(data56, time, alt16);
 
-            long utcupdate = tcas.getUpdateTime();
             Timestamp utcdetect = new Timestamp(tcas.getDetectTime());
 
             /*
@@ -397,7 +396,6 @@ public final class DataBlockParser extends Thread {
             
             String update = String.format("INSERT INTO tcasalerts ("
                     + "acid,"
-                    + "utcupdate,"
                     + "utcdetect,"
                     + "ttibits,"
                     + "threatid,"
@@ -411,11 +409,13 @@ public final class DataBlockParser extends Thread {
                     + "single_ra,"
                     + "multiple_ra,"
                     + "multiplethreats,"
-                    + "threatterminated) VALUES ("
-                    + "'%s',%d,'%s',%d,'%s',%d,%d,%f,%f,%d,%d,"
-                    + "%d,%d,%d,%d,%d)",
+                    + "threatterminated,"
+                    + "identitydata,"
+                    + "typedata) VALUES ("
+                    + "'%s','%s',%d,'%s',%d,%d,%f,%f,%d,%d,"
+                    + "%d,%d,%d,%d,%d,"
+                    + "'%s','%s')",
                     acid,
-                    utcupdate,
                     utcdetect.toString(),
                     tcas.getThreatTypeIndicator(),
                     tcas.getThreatICAOID(),
@@ -429,7 +429,9 @@ public final class DataBlockParser extends Thread {
                     tcas.getSingleRA() ? 1 : 0,
                     tcas.getMultipleRA() ? 1 : 0,
                     tcas.getHasMultipleThreats() ? 1 : 0,
-                    tcas.getThreatTerminated() ? 1 : 0);
+                    tcas.getThreatTerminated() ? 1 : 0,
+                    tcas.getThreatIdentityData(),
+                    tcas.getThreatTypeData());
 
             try {
                 querytt = db2.createStatement();
