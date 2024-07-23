@@ -10,6 +10,12 @@ public final class Track implements IConstants {
 
     private String acid;            // Aircraft ID
     private String registration;    // N-Number if USA registered
+    private String callsign;        // 8 character string
+    private String squawk;          // 4 digit octal code
+    //
+    private long updatedTime;        // zulu time object was updated
+    private long updatedPositionTime;// zulu time object lat/lon position was updated
+    //
     private int mode;               // Track mode
     private int amplitude;          // last amplitude received
     private int positionMode;
@@ -17,7 +23,17 @@ public final class Track implements IConstants {
     private int verticalRate;       // fps
     private int verticalTrend;      // -1 = down, 0 = level, 1 = up
     private final int[] trend = new int[10];
-    private static int trend_el = 0;
+    private int trend_el;
+    private int version;
+    private int category;
+    private int altitudeDF00;
+    private int altitudeDF04;
+    private int altitudeDF16;
+    private int altitudeDF17;
+    private int altitudeDF18;
+    private int altitudeDF20;
+    private int radarIID;           // IID is a II code (00 - 15)
+    //
     private float groundSpeed;      // kts
     private float groundTrack;      // deg
     private float groundSpeedComputed;
@@ -27,20 +43,8 @@ public final class Track implements IConstants {
     private float ias;
     private float tas;
     private float heading;
-    private String callsign;        // 8 character string
-    private String squawk;          // 4 digit octal code
     //
-    private int version;
-    private int category;
-    private int altitudeDF00;
-    private int altitudeDF04;
-    private int altitudeDF16;
-    private int altitudeDF17;
-    private int altitudeDF18;
-    private int altitudeDF20;
-    private int radarIID;                       // IID is a II code (00 - 15)
-    private boolean si;                         // IID is a SI code (00 - 63)
-    //
+    private boolean si;             // IID is a SI code (00 - 63)
     private boolean alert;          // octal code changed bit
     private boolean emergency;      // emergency bit
     private boolean spi;            // ident bit
@@ -48,16 +52,11 @@ public final class Track implements IConstants {
     private boolean isVirtOnGround; // Virtual onGround for MMS2
     private boolean hijack;
     private boolean comm_out;
-    //
     private boolean hadAlert;
     private boolean hadEmergency;
     private boolean hadSPI;
-    //
-    private long updatedTime;        // zulu time object was updated
-    private long updatedPositionTime;// zulu time object lat/lon position was updated
     private boolean updated;        // set on update, cleared on sent
     private boolean updatePosition;
-    //
     private boolean isLocal;            // Target is from one of our radars/not remote
     private boolean isRelayed;          // Target has been relayed by a ground site (TIS-B)
 
@@ -91,6 +90,7 @@ public final class Track implements IConstants {
         radarIID = -99;
         verticalRate = -9999;
         verticalTrend = 0;
+        trend_el = 0;
         altitudeDF00 = -9999;
         altitudeDF04 = -9999;
         altitudeDF16 = -9999;

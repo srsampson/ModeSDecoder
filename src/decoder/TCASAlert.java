@@ -89,8 +89,8 @@ public final class TCASAlert {
         detectTime = time;
 
         // These fit into an Integer in Java
-        threatIdentityData = (int)(data56 & 0x3FFFFFFL);          // 26 bits masked off
-        threatTypeData = (int)((data56 & 0x3FFFFFFFL) >>> 26);    // 30 bits left over
+        threatIdentityData = (int)(data56 & 0x3FFFFFFL);    // 26 bits masked off
+        threatTypeData = (int)(data56 >>> 26);              // 30 bits left over
         /*
          * TTI Bits:
          * 
@@ -99,11 +99,11 @@ public final class TCASAlert {
          * 10 Threat identity data contains altitude, range, and bearing
          * 11 Not assigned
          */
-        tti = (threatTypeData & 0x3);                       // bit 29,30 Threat Type Indicator
-        multipleRA = (((threatTypeData >>> 2) & 0x1) == 1);       // bit 28
-        threatTerminated = (((threatTypeData >>> 3) & 0x1) == 1); // bit 27
+        tti = (threatTypeData & 0x3);                               // bit 29,30 Threat Type Indicator
+        multipleRA = (((threatTypeData >>> 2) & 0x1) == 1);         // bit 28
+        threatTerminated = (((threatTypeData >>> 3) & 0x1) == 1);   // bit 27
         
-        singleRA = (((threatTypeData >>> 21) & 0x1) == 1);        // bit 9
+        singleRA = (((threatTypeData >>> 21) & 0x1) == 1);          // bit 9
         noRA = ((singleRA == false) && (multipleRA == false));
         
         /*

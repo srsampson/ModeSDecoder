@@ -8,7 +8,6 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -387,8 +386,6 @@ public final class DataBlockParser extends Thread {
 
             TCASAlert tcas = new TCASAlert(data56, time, alt16);
 
-            Timestamp utcdetect = new Timestamp(tcas.getDetectTime());
-
             /*
              * Some TCAS are just advisory, no RA generated
              * Note: TCASAlert class only sets time if RA is active.
@@ -400,9 +397,9 @@ public final class DataBlockParser extends Thread {
                     + "ttibits,"
                     + "threatid,"
                     + "threatrelativealtitude,"
-                    + "altitude,"
-                    + "bearing,"
-                    + "range,"
+                    + "taltitude,"
+                    + "tbearing,"
+                    + "trange,"
                     + "arabits,"
                     + "racbits,"
                     + "active_ra,"
@@ -412,11 +409,11 @@ public final class DataBlockParser extends Thread {
                     + "threatterminated,"
                     + "identitydata,"
                     + "typedata) VALUES ("
-                    + "'%s','%s',%d,'%s',%d,%d,%f,%f,%d,%d,"
+                    + "'%s',%d,%d,'%s',NULLIF(%d,-9999),NULLIF(%d,-9999),NULLIF(%.1f,-999.0),NULLIF(%.1f,-999.0),%d,%d,"
                     + "%d,%d,%d,%d,%d,"
                     + "'%s','%s')",
                     acid,
-                    utcdetect.toString(),
+                    tcas.getDetectTime(),
                     tcas.getThreatTypeIndicator(),
                     tcas.getThreatICAOID(),
                     tcas.getThreatRelativeAltitude(),
@@ -959,12 +956,12 @@ public final class DataBlockParser extends Thread {
                                 updateTargetOnGround(acid, isOnGround, detectTime);
 
                                 if (df16.getBDS() == 0x30) {   // BDS 3,0
-                                    /*
-                                     * Some planes send Zero's
-                                     */
                                     data56 = df16.getData56();
-
-                                    if (data56 != 30000000000000L) {
+                                    int data26 = (int)(data56 >>> 26);
+                                    /*
+                                     * Some planes send TTI = 0 which means nothing to do
+                                     */
+                                    if ((data26 & 0x3) != 0) {
                                         insertTCASAlert(acid, data56, detectTime);
                                     }
                                 }

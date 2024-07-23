@@ -235,14 +235,14 @@ DROP TABLE IF EXISTS `tcasalerts`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tcasalerts` (
   `record_num` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'TCAS ID',
-  `utcdetect` timestamp NOT NULL,
+  `utcdetect` bigint unsigned NOT NULL,
   `acid` char(6) NOT NULL COMMENT 'Aircraft ID',
   `ttibits` int unsigned DEFAULT NULL,
   `threatid` char(6) NOT NULL COMMENT 'Threat ICAO ID',
   `threatrelativealtitude` int DEFAULT NULL,
-  `altitude` int DEFAULT NULL,
-  `bearing` float DEFAULT NULL,
-  `range` float DEFAULT NULL,
+  `taltitude` int DEFAULT NULL,
+  `tbearing` float DEFAULT NULL,
+  `trange` float DEFAULT NULL,
   `arabits` int unsigned DEFAULT NULL,
   `racbits` int unsigned DEFAULT NULL,
   `active_ra` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'single_ra || multiple_ra true',
@@ -273,4 +273,4 @@ CREATE TABLE `tcasalerts` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-23  4:19:34
+-- Dump completed on 2024-07-23 12:44:10
