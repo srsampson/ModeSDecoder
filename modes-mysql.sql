@@ -235,7 +235,6 @@ DROP TABLE IF EXISTS `tcasalerts`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tcasalerts` (
   `record_num` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'TCAS ID',
-  `utcupdate` bigint unsigned NOT NULL COMMENT 'The updatetime will be zero 0 if the activeRA is false',
   `utcdetect` timestamp NOT NULL,
   `acid` char(6) NOT NULL COMMENT 'Aircraft ID',
   `ttibits` int unsigned DEFAULT NULL,
@@ -244,15 +243,17 @@ CREATE TABLE `tcasalerts` (
   `altitude` int DEFAULT NULL,
   `bearing` float DEFAULT NULL,
   `range` float DEFAULT NULL,
-  `arabits` int DEFAULT NULL,
-  `racbits` int DEFAULT NULL,
+  `arabits` int unsigned DEFAULT NULL,
+  `racbits` int unsigned DEFAULT NULL,
   `active_ra` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'single_ra || multiple_ra true',
   `single_ra` tinyint(1) NOT NULL DEFAULT '0',
   `multiple_ra` tinyint(1) NOT NULL DEFAULT '0',
   `multiplethreats` tinyint(1) NOT NULL DEFAULT '0',
   `threatterminated` tinyint(1) NOT NULL DEFAULT '0',
+  `identitydata` varchar(45) DEFAULT NULL,
+  `typedata` varchar(45) DEFAULT NULL,
   PRIMARY KEY (`record_num`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TCAS Alerts';
+) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TCAS Alerts';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -272,4 +273,4 @@ CREATE TABLE `tcasalerts` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-19 18:56:56
+-- Dump completed on 2024-07-23  4:19:34
