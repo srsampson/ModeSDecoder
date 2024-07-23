@@ -22,7 +22,7 @@ public interface IDF00 {
      * Getter to return altitude in feet
      * 
      * Altitude may be in 100 or 25 foot resolution.
-     * Returns -9999 if error detected.
+     * Returns -9999 (NULL) if error detected.
      * 
      * @return an int representing the altitude in feet
      */

@@ -157,7 +157,8 @@ public class PressureAltitude {
                 altitudeCorrection = (int) Math.round((STANDARD - airportAltimeter) * 1000.0);
                 pressureAltitude = (airportElevation + altitudeCorrection);
                 airportDataValid = true;
-//
+
+//Used for debugging
 //                System.out.println("Pressure Altitude Correction "
 //                        + altitudeCorrection
 //                        + " As of "

@@ -57,6 +57,11 @@ public final class DownlinkFormat16 implements IDF16 {
 
         /*
          * The 4th and 5th hex digits contain the ri4 bits 0XXX X000
+         *
+         * 0000 : No operating ACAS
+         * 0010 : ACAS with resolution capability inhibited
+         * 0011 : ACAS with vertical-only resolution capability
+         * 0111 : ACAS with vertical and horizontal resolution capability
          */
         tmp = Integer.parseInt(raw56.substring(3, 5), 16);
         ri4 = (tmp >>> 3) & 0x0F;

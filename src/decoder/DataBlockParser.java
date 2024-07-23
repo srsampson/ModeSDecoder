@@ -149,7 +149,8 @@ public final class DataBlockParser extends Thread {
         
         task3 = new removeTCASAlerts();
         timer3 = new Timer();
-        timer3.scheduleAtFixedRate(task3, 14L, RATE3);
+//TODO OFF for debugging
+//timer3.scheduleAtFixedRate(task3, 14L, RATE3);
 
         process = new Thread(this);
         process.setName("DataBlockParser");
@@ -411,7 +412,8 @@ public final class DataBlockParser extends Thread {
                     + "multiple_ra,"
                     + "multiplethreats,"
                     + "threatterminated) VALUES ("
-                    + "'%s',%d,'%s',%d,'%s',%d,%d,%f,%f,%d,%d,%d,%d,%d,%d,%d)",
+                    + "'%s',%d,'%s',%d,'%s',%d,%d,%f,%f,%d,%d,"
+                    + "%d,%d,%d,%d,%d)",
                     acid,
                     utcupdate,
                     utcdetect.toString(),
@@ -961,7 +963,7 @@ public final class DataBlockParser extends Thread {
                                     data56 = df16.getData56();
 
                                     if (data56 != 30000000000000L) {
-                                        insertTCASAlert(acid, detectTime, data56);
+                                        insertTCASAlert(acid, data56, detectTime);
                                     }
                                 }
                             }
@@ -1247,7 +1249,7 @@ public final class DataBlockParser extends Thread {
                                      * Some planes send Zero's for some damned reason
                                      */
                                     if (data56 != 30000000000000L) {
-                                        insertTCASAlert(acid, detectTime, data56);
+                                        insertTCASAlert(acid, data56, detectTime);
                                     }
                                 }
                             }
@@ -1296,7 +1298,7 @@ public final class DataBlockParser extends Thread {
                                          * Some planes send Zero's for some damned reason
                                          */
                                         if ((data56 & 0x0FFFFFFFFFFFFFL) != 0) {    // 52-Bits all zero
-                                            insertTCASAlert(acid, detectTime, data56);
+                                            insertTCASAlert(acid, data56, detectTime);
                                         }
                                 }
                             }

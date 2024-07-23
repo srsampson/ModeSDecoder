@@ -6,7 +6,10 @@ package decoder;
 /*
  * This is the IDF16 Interface
  *
- * Used with TCAS to exchange altitude and RA information
+ * Used with TCAS to exchange altitude, TA,  and RA information
+ *
+ * TA = Traffic Advisory (no action needed)
+ * RA - Resolution Advisory (action needed)
  */
 public interface IDF16 {
 

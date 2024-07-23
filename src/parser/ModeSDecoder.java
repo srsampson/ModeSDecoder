@@ -49,7 +49,8 @@ public final class ModeSDecoder {
 
         config = new Config(configFile);
 
-        PressureAltitude pa = new PressureAltitude(config);   // Start PA data source
+//TODO OFF for debugging
+//PressureAltitude pa = new PressureAltitude(config);   // Start PA data source
 
         /*
          * Create a pipe between Serial and ProcessData threads

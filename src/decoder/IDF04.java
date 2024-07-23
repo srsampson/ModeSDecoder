@@ -14,6 +14,14 @@ package decoder;
  */
 public interface IDF04 extends IStatus, IAlert {
 
+    /**
+     * Getter to return altitude in feet
+     * 
+     * Altitude may be in 100 or 25 foot resolution.
+     * Returns -9999 (NULL) if error detected.
+     * 
+     * @return an int representing the altitude in feet
+     */
     public int getAltitude();
     
     public long getUpdateTime();
