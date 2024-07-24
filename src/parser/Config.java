@@ -22,7 +22,7 @@ public final class Config {
     //
     private int amplitude;
     private int radarscan;
-    private int radarid;
+    private int radar_site;
     //
     private float latitude;    // degrees
     private float longitude;   // degrees
@@ -41,7 +41,7 @@ public final class Config {
         commPort = "COM4";
         airportName = "";
         radarscan = 3;      // simulates a 20 RPM antenna, 10 would be 6 RPM
-        radarid = 0;
+        radar_site = 0;
         databaseTargetTimeout = 3;    // 3 minutes
         amplitude = 0;
         //
@@ -73,15 +73,15 @@ public final class Config {
          * none given.
          */
         if (Props != null) {
-            temp = Props.getProperty("radar.id");
+            temp = Props.getProperty("radar.site");
             if (temp == null) {
-                radarid = 0;
-                System.out.println("radar.id not set, set to 0");
+                radar_site = 0;
+                System.out.println("radar.site not set, set to 0");
             } else {
                 try {
-                    radarid = Integer.parseInt(temp.trim());
+                    radar_site = Integer.parseInt(temp.trim());
                 } catch (NumberFormatException e3) {
-                    radarid = 0;
+                    radar_site = 0;
                 }
             }
 
@@ -301,8 +301,8 @@ public final class Config {
      *
      * @return a int Representing a numeric radar ID
      */
-    public int getRadarID() {
-        return this.radarid;
+    public int getRadarSite() {
+        return this.radar_site;
     }
 
     public int getRadarScanTime() {

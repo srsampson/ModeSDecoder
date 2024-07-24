@@ -16,7 +16,7 @@ public interface IDF11 {
 
     public int getRadarIID();
 
-    public boolean getSI();;       
+    public boolean getRadarSI();;       
     
     public long getUpdateTime();
 }

@@ -15,7 +15,7 @@ public final class DownlinkFormat00 implements IDF00 {
     private int altitude;
     private final int ri4;
     private final long timestamp;
-    private String acid;
+    private String icao;
     private boolean crosslinkCapable;
     private final boolean isOnGround;
     private final boolean cc1;
@@ -31,7 +31,7 @@ public final class DownlinkFormat00 implements IDF00 {
         alt = new Altitude();
 
         timestamp = time;
-        acid = "";
+        icao = "";
         altitude = -9999;
 
         altitude = alt.decodeAltitude(raw56.substring(0, 8), true);    // true == has the Metre Bit
@@ -43,7 +43,7 @@ public final class DownlinkFormat00 implements IDF00 {
          * This is effected by interference and garbled bits, so you have to
          * validate this ACID with the list of DF11,DF17, and DF18 packets.
          */
-        acid = crc.crcCompute(raw56);
+        icao = crc.crcCompute(raw56);
 
         /*
          * The second hex digit is the vs1 and cc1 bits 0XX0
@@ -89,8 +89,8 @@ public final class DownlinkFormat00 implements IDF00 {
         return altitude;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     public long getTimestamp() {

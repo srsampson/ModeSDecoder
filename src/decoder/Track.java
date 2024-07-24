@@ -8,7 +8,7 @@ package decoder;
  */
 public final class Track implements IConstants {
 
-    private String acid;            // Aircraft ID
+    private String icao;            // ICAO ID
     private String registration;    // N-Number if USA registered
     private String callsign;        // 8 character string
     private String squawk;          // 4 digit octal code
@@ -61,7 +61,7 @@ public final class Track implements IConstants {
     private boolean isRelayed;          // Target has been relayed by a ground site (TIS-B)
 
     /**
-     * A track is the complete data structure of the Aircraft ID (acid).
+     * A track is the complete data structure of the ICAO ID (icao).
      * It takes several different target reports to gather all the data,
      * but this is where it is finally stored.
      *
@@ -71,7 +71,7 @@ public final class Track implements IConstants {
     public Track(String ac, boolean relayed) {
         isLocal = true;
         isRelayed = relayed;
-        acid = ac;
+        icao = ac;
         registration = "";
         version = 0;
         category = 0;
@@ -190,17 +190,17 @@ public final class Track implements IConstants {
      *
      * @return a string Representing the track Mode-S Hex ID
      */
-    public String getAircraftID() {
-        return acid;
+    public String getAircraftICAO() {
+        return icao;
     }
 
     /**
-     * Method to set the Aircraft Mode-S Hex ID
+     * Method to set the Aircraft Mode-S ICAO ID
      *
      * @param val a string Representing the track Mode-S Hex ID
      */
-    public void setAircraftID(String val) {
-        acid = val;
+    public void setAircraftICAO(String val) {
+        icao = val;
     }
 
     /**
@@ -276,7 +276,7 @@ public final class Track implements IConstants {
         }
     }
 
-    public boolean getSI() {
+    public boolean getRadarSI() {
         return si;
     }
 

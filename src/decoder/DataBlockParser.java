@@ -4,13 +4,11 @@
 package decoder;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -40,19 +38,18 @@ public final class DataBlockParser extends Thread {
     private final ZuluMillis zulu;
     private DataBlock dbk;
     //
-    private Connection db1;
-    private Connection db2;
+    private Connection db;
     private Statement query;
     private Statement querytt;
     private final Config config;
 
-    private int radarid;
+    private int radar_site;
     private final long targetTimeout;
     private long radarscan;
     //
     private static boolean EOF;
     private String data;
-    private String acid;
+    private String icao_number;
     private String callsign;
     private String squawk;
     //
@@ -87,46 +84,20 @@ public final class DataBlockParser extends Thread {
     private final TimerTask task3;
     private final TimerTask targetTimeoutTask;
     
-    public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd) {
+    public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd, Connection dbc) {
         zulu = new ZuluMillis();
         config = cf;
         receiverLatLon = ll;
         buf = bd;
+        db = dbc;
 
-        radarid = cf.getRadarID();
+        radar_site = cf.getRadarSite();
         radarscan = (long) cf.getRadarScanTime() * 1000L;
-        acid = "";
+        icao_number = "";
         callsign = "";
         squawk = "";
         EOF = false;        
 
-        String connectionURL = config.getDatabaseURL();
-
-        Properties properties = new Properties();
-        properties.setProperty("user", config.getDatabaseLogin());
-        properties.setProperty("password", config.getDatabasePassword());
-        properties.setProperty("useSSL", "false");
-        properties.setProperty("allowPublicKeyRetrieval", "true");
-        properties.setProperty("serverTimezone", "UTC");
-
-        /*
-         * You need the ODBC MySQL driver library in the same directory you have
-         * the executable JAR file of this program, but under a lib directory.
-         */
-        try {
-            db1 = DriverManager.getConnection(connectionURL, properties);
-        } catch (SQLException e2) {
-            System.err.println("DataBlockParser Fatal: Unable to open database 1 " + connectionURL + " " + e2.getLocalizedMessage());
-            System.exit(0);
-        }
-
-        try {
-            db2 = DriverManager.getConnection(connectionURL, properties);
-        } catch (SQLException e3) {
-            System.err.println("DataBlockParser Fatal: Unable to open database 2" + connectionURL + " " + e3.getLocalizedMessage());
-            System.exit(0);
-        }
-        
         targets = new ConcurrentHashMap<>();
 
         pm = new PositionManager(receiverLatLon, this);
@@ -165,8 +136,7 @@ public final class DataBlockParser extends Thread {
         EOF = true;
         
         try {
-            db1.close();
-            db2.close();
+            db.close();
         } catch (SQLException e) {
             System.out.println("DataBlockParser::close Closing Bug " + e.getMessage());
             System.exit(0);
@@ -201,14 +171,14 @@ public final class DataBlockParser extends Thread {
              * probably not going to need any further computations.
              */
             update = String.format(
-                    "INSERT INTO targethistory ("
+                    "INSERT INTO target_history ("
                     + "flight_id,"
-                    + "radar_id,"
-                    + "acid,"
+                    + "radar_site,"
+                    + "icao_number,"
                     + "utcdetect,"
                     + "utcfadeout,"
-                    + "radariid,"
-                    + "si,"
+                    + "radar_iid,"
+                    + "radar_si,"
                     + "altitude,"
                     + "altitudedf00,"
                     + "altitudedf04,"
@@ -236,12 +206,12 @@ public final class DataBlockParser extends Thread {
                     + "hadEmergency,"
                     + "hadSPI"
                     + ") SELECT flight_id,"
-                    + "radar_id,"
-                    + "acid,"
+                    + "radar_site,"
+                    + "icao_number,"
                     + "FROM_UNIXTIME(utcdetect/1000),"
                     + "FROM_UNIXTIME(utcupdate/1000),"
-                    + "radariid,"
-                    + "si,"
+                    + "radar_iid,"
+                    + "radar_si,"
                     + "altitude,"
                     + "altitudedf00,"
                     + "altitudedf04,"
@@ -268,11 +238,11 @@ public final class DataBlockParser extends Thread {
                     + "hadAlert,"
                     + "hadEmergency,"
                     + "hadSPI"
-                    + " FROM target WHERE target.utcupdate <= %d",
+                    + " FROM target_table WHERE target_table.utcupdate <= %d",
                     timeout);
 
             try {
-                querytt = db2.createStatement();
+                querytt = db.createStatement();
                 querytt.executeUpdate(update);
                 querytt.close();
             } catch (SQLException tt1) {
@@ -283,10 +253,10 @@ public final class DataBlockParser extends Thread {
                 System.out.println("TargetTimeoutThread::run targethistory SQL Error: " + update + " " + tt1.getMessage());
             }
 
-            update = String.format("DELETE FROM target WHERE utcupdate <= %d", timeout);
+            update = String.format("DELETE FROM target_table WHERE utcupdate <= %d", timeout);
 
             try {
-                querytt = db2.createStatement();
+                querytt = db.createStatement();
                 querytt.executeUpdate(update);
                 querytt.close();
             } catch (SQLException tt3) {
@@ -299,15 +269,15 @@ public final class DataBlockParser extends Thread {
         }
     }
 
-    public boolean hasTarget(String acid) throws NullPointerException {
+    public boolean hasTarget(String icao) throws NullPointerException {
         synchronized (targets) {
-            return targets.containsKey(acid);
+            return targets.containsKey(icao);
         }
     }
 
-    public Track getTarget(String acid) throws NullPointerException {
+    public Track getTarget(String icao) throws NullPointerException {
         synchronized (targets) {
-            return targets.get(acid);
+            return targets.get(icao);
         }
     }
 
@@ -355,19 +325,19 @@ public final class DataBlockParser extends Thread {
     /**
      * Put target on queue after being created or updated
      *
-     * @param acid a String representing the Aircraft ID
+     * @param icao a String representing the Aircraft ID
      * @param obj an Object representing the Target data
      */
-    public void addTarget(String acid, Track obj) throws NullPointerException {
+    public void addTarget(String icao, Track obj) throws NullPointerException {
        synchronized (targets) {
-           targets.put(acid, obj);
+           targets.put(icao, obj);
        }
     }
 
-    public void removeTarget(String acid) throws NullPointerException {
+    public void removeTarget(String icao) throws NullPointerException {
        synchronized (targets) {
-            if (targets.containsKey(acid) == true) {
-                targets.remove(acid);
+            if (targets.containsKey(icao) == true) {
+                targets.remove(icao);
             }
        }
     }
@@ -391,28 +361,28 @@ public final class DataBlockParser extends Thread {
              * Note: TCASAlert class only sets time if RA is active.
              */
             
-            String update = String.format("INSERT INTO tcasalerts ("
-                    + "acid,"
+            String update = String.format("INSERT INTO tcas_alerts ("
+                    + "icao_number,"
                     + "utcdetect,"
                     + "ttibits,"
-                    + "threatid,"
-                    + "threatrelativealtitude,"
-                    + "taltitude,"
-                    + "tbearing,"
-                    + "trange,"
-                    + "arabits,"
-                    + "racbits,"
+                    + "threat_icao,"
+                    + "threat_relative_altitude,"
+                    + "threat_altitude,"
+                    + "threat_bearing,"
+                    + "threat_range,"
+                    + "ara_bits,"
+                    + "rac_bits,"
                     + "active_ra,"
                     + "single_ra,"
                     + "multiple_ra,"
-                    + "multiplethreats,"
-                    + "threatterminated,"
-                    + "identitydata,"
-                    + "typedata) VALUES ("
+                    + "multiple_threats,"
+                    + "threat_terminated,"
+                    + "identity_data_raw,"
+                    + "type_data_raw) VALUES ("
                     + "'%s',%d,%d,'%s',NULLIF(%d,-9999),NULLIF(%d,-9999),NULLIF(%.1f,-999.0),NULLIF(%.1f,-999.0),%d,%d,"
                     + "%d,%d,%d,%d,%d,"
                     + "'%s','%s')",
-                    acid,
+                    icao_number,
                     tcas.getDetectTime(),
                     tcas.getThreatTypeIndicator(),
                     tcas.getThreatICAOID(),
@@ -431,7 +401,7 @@ public final class DataBlockParser extends Thread {
                     tcas.getThreatTypeData());
 
             try {
-                querytt = db2.createStatement();
+                querytt = db.createStatement();
                 querytt.executeUpdate(update);
                 querytt.close();
             } catch (SQLException tt3) {
@@ -453,10 +423,10 @@ public final class DataBlockParser extends Thread {
         public void run() {
             long time = zulu.getUTCTime() - (30L * 60L * 1000L); // subtract 30 minutes
         
-            String update = String.format("DELETE FROM tcasalerts WHERE utcupdate <= %d", time);
+            String update = String.format("DELETE FROM tcas_alerts WHERE utcupdate <= %d", time);
 
             try {
-                querytt = db2.createStatement();
+                querytt = db.createStatement();
                 querytt.executeUpdate(update);
                 querytt.close();
             } catch (SQLException tt3) {
@@ -499,7 +469,7 @@ public final class DataBlockParser extends Thread {
                         delta = Math.abs(currentTime - id.getUpdatedTime());
 
                         if (delta >= targetTimeout) {
-                            removeTarget(id.getAircraftID());
+                            removeTarget(id.getAircraftICAO());
                         }
                     }
                 } catch (NullPointerException e2) {
@@ -524,7 +494,7 @@ public final class DataBlockParser extends Thread {
         public void run() {
             currentTime = zulu.getUTCTime();
             delta = 0L;
-            String acid;
+            String icao;
 
             try {
                 targets = getAllTargets();
@@ -535,7 +505,7 @@ public final class DataBlockParser extends Thread {
             for (Track id : targets) {
                 try {
                     if (id.getTrackQuality() > 0) {
-                        acid = id.getAircraftID();
+                        icao = id.getAircraftICAO();
 
                         // find the idStatus reports that haven't been position updated in 30 seconds
                         delta = Math.abs(currentTime - id.getUpdatedPositionTime());
@@ -543,7 +513,7 @@ public final class DataBlockParser extends Thread {
                         if (delta >= RATE1) {
                             id.decrementTrackQuality();
                             id.setUpdatedTime(currentTime);
-                            addTarget(acid, id);   // overwrite
+                            addTarget(icao, id);   // overwrite
                         }
                     }
                 } catch (NullPointerException e1) {
@@ -781,535 +751,540 @@ public final class DataBlockParser extends Thread {
 
             for (int i = 0; i < qsize; i++) {
                 dbk = buf.popData();
-                amplitude = dbk.getSignalLevel();
-                data = dbk.getData();
-                detectTime = dbk.getUTCTime();
 
-                int df5 = ((Integer.parseInt(data.substring(0, 2), 16)) >>> 3) & 0x1F;
+                if (dbk != null) {
+                    amplitude = dbk.getSignalLevel();
+                    data = dbk.getData();
+                    detectTime = dbk.getUTCTime();
 
-                /*
-                 * Most decoders pass a lot of garble packets, so we
-                 * first check if DF11 or DF17/18 have validated
-                 * the packet by calling hasTarget().  If not, then
-                 * it is garbled.
-                 *
-                 * Note: The DF code itself may be garbled
-                 */
-                switch (df5) {
-                    case 0:
-                        /*
-                         * Check data for correct length
-                         * A short packet needs 56 bits/7 bytes/14 nibbles
-                         */
-                        if (data.length() < 14) {
-                            System.out.println("DF00 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
+                    int df5 = ((Integer.parseInt(data.substring(0, 2), 16)) >>> 3) & 0x1F;
 
-                        DownlinkFormat00 df00 = new DownlinkFormat00(data, detectTime);
-                        acid = df00.getACID();
-
-                        try {
-                            if (hasTarget(acid)) {           // must be valid then
-                                altitude = df00.getAltitude();
-                                isOnGround = df00.getIsOnGround();      // true if vs1 == 1
-
-                                updateTargetAmplitude(acid, amplitude, detectTime);
-                                updateTargetAltitudeDF00(acid, altitude, detectTime);
-                                updateTargetOnGround(acid, isOnGround, detectTime);
+                    /*
+                     * Most decoders pass a lot of garble packets, so we
+                     * first check if DF11 or DF17/18 have validated
+                     * the packet by calling hasTarget().  If not, then
+                     * it is garbled.
+                     *
+                     * Note: The DF code itself may be garbled
+                     */
+                    switch (df5) {
+                        case 0:
+                            /*
+                             * Check data for correct length
+                             * A short packet needs 56 bits/7 bytes/14 nibbles
+                             */
+                            if (data.length() < 14) {
+                                System.out.println("DF00 Error " + data.length() + " Hex Length");
+                                break;
                             }
-                        } catch (NullPointerException np) {
-                            /*
-                             * Not likely to occur
-                             */
-                            System.err.println(np);
-                        }
-                        break;
-                    case 4:
-                        /*
-                         * Check data for correct length
-                         * A short packet needs 56 bits/7 bytes/14 nibbles
-                         */
-                        if (data.length() < 14) {
-                            System.out.println("DF04 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
 
-                        DownlinkFormat04 df04 = new DownlinkFormat04(data, detectTime);
-                        acid = df04.getACID();
+                            DownlinkFormat00 df00 = new DownlinkFormat00(data, detectTime);
+                            icao_number = df00.getICAO();
 
-                        try {
-                            if (hasTarget(acid)) {
-                                altitude = df04.getAltitude();
-                                isOnGround = df04.getIsOnGround();
-                                alert = df04.getIsAlert();
-                                spi = df04.getIsSPI();
-                                emergency = df04.getIsEmergency();
-
-                                updateTargetAmplitude(acid, amplitude, detectTime);
-                                updateTargetAltitudeDF04(acid, altitude, detectTime);
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-                            }
-                        } catch (NullPointerException np) {
-                            /*
-                             * Not likely to occur
-                             */
-                            System.err.println(np);
-                        }
-                        break;
-                    case 5:
-                        /*
-                         * Check data for correct length
-                         * A short packet needs 56 bits/7 bytes/14 nibbles
-                         */
-                        if (data.length() < 14) {
-                            System.out.println("DF05 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
-
-                        DownlinkFormat05 df05 = new DownlinkFormat05(data, detectTime);
-                        acid = df05.getACID();
-
-                        try {
-                            if (hasTarget(acid)) {
-                                squawk = df05.getSquawk();
-                                isOnGround = df05.getIsOnGround();
-                                alert = df05.getIsAlert();
-                                spi = df05.getIsSPI();
-                                emergency = df05.getIsEmergency();
-
-                                updateTargetAmplitude(acid, amplitude, detectTime);
-                                updateTargetSquawk(acid, squawk, detectTime);
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-                            }
-                        } catch (NullPointerException np) {
-                            /*
-                             * Not likely to occur
-                             */
-                            System.err.println(np);
-                        }
-                        break;
-                    case 11:
-                        /*
-                         * Check data for correct length
-                         * A short packet needs 56 bits/7 bytes/14 nibbles
-                         */
-                        if (data.length() < 14) {
-                            System.out.println("DF11 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
-
-                        DownlinkFormat11 df11 = new DownlinkFormat11(data, detectTime);
-                        acid = df11.getACID();
-
-                        if (df11.isValid()) {
-                            /*
-                             * See if Target already exists
-                             */
                             try {
-                                if (hasTarget(acid) == false) {
-                                    /*
-                                     * New Target
-                                     */
-                                    Track t = new Track(acid, false);  // false == not TIS
-                                    t.setRegistration(nconverter.icao_to_n(acid));
-                                    addTarget(acid, t);
+                                if (hasTarget(icao_number)) {           // must be valid then
+                                    altitude = df00.getAltitude();
+                                    isOnGround = df00.getIsOnGround();      // true if vs1 == 1
+
+                                    updateTargetAmplitude(icao_number, amplitude, detectTime);
+                                    updateTargetAltitudeDF00(icao_number, altitude, detectTime);
+                                    updateTargetOnGround(icao_number, isOnGround, detectTime);
                                 }
                             } catch (NullPointerException np) {
                                 /*
                                  * Not likely to occur
                                  */
                                 System.err.println(np);
+                            }
+                            break;
+                        case 4:
+                            /*
+                             * Check data for correct length
+                             * A short packet needs 56 bits/7 bytes/14 nibbles
+                             */
+                            if (data.length() < 14) {
+                                System.out.println("DF04 Error " + data.length() + " Hex Length");
                                 break;
                             }
-                            
-                            updateTargetAmplitude(acid, amplitude, detectTime);
 
-                            radarIID = df11.getRadarIID();
-                            si = df11.getSI();
-                            updateTargetRadarID(acid, radarIID, si, detectTime);
+                            DownlinkFormat04 df04 = new DownlinkFormat04(data, detectTime);
+                            icao_number = df04.getICAO();
 
-                            isOnGround = df11.getIsOnGround();
-                            updateTargetOnGround(acid, isOnGround, detectTime);
-                        }
-                        break;
-                    case 16:
-                        /*
-                         * Check data for correct length
-                         * A short packet needs 56 bits/7 bytes/14 nibbles
-                         */
-                        if (data.length() < 14) {
-                            System.out.println("DF16 Error " + data.length()  + " Hex Length");
+                            try {
+                                if (hasTarget(icao_number)) {
+                                    altitude = df04.getAltitude();
+                                    isOnGround = df04.getIsOnGround();
+                                    alert = df04.getIsAlert();
+                                    spi = df04.getIsSPI();
+                                    emergency = df04.getIsEmergency();
+
+                                    updateTargetAmplitude(icao_number, amplitude, detectTime);
+                                    updateTargetAltitudeDF04(icao_number, altitude, detectTime);
+                                    updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                }
+                            } catch (NullPointerException np) {
+                                /*
+                                 * Not likely to occur
+                                 */
+                                System.err.println(np);
+                            }
                             break;
-                        }
+                        case 5:
+                            /*
+                             * Check data for correct length
+                             * A short packet needs 56 bits/7 bytes/14 nibbles
+                             */
+                            if (data.length() < 14) {
+                                System.out.println("DF05 Error " + data.length() + " Hex Length");
+                                break;
+                            }
 
-                        DownlinkFormat16 df16 = new DownlinkFormat16(data, detectTime);
-                        acid = df16.getACID();
+                            DownlinkFormat05 df05 = new DownlinkFormat05(data, detectTime);
+                            icao_number = df05.getICAO();
 
-                        try {
-                            if (hasTarget(acid)) {
-                                isOnGround = df16.getIsOnGround();
-                                altitude = df16.getAltitude();
+                            try {
+                                if (hasTarget(icao_number)) {
+                                    squawk = df05.getSquawk();
+                                    isOnGround = df05.getIsOnGround();
+                                    alert = df05.getIsAlert();
+                                    spi = df05.getIsSPI();
+                                    emergency = df05.getIsEmergency();
 
-                                updateTargetAmplitude(acid, amplitude, detectTime);
-                                updateTargetAltitudeDF16(acid, altitude, detectTime);
-                                updateTargetOnGround(acid, isOnGround, detectTime);
+                                    updateTargetAmplitude(icao_number, amplitude, detectTime);
+                                    updateTargetSquawk(icao_number, squawk, detectTime);
+                                    updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                }
+                            } catch (NullPointerException np) {
+                                /*
+                                 * Not likely to occur
+                                 */
+                                System.err.println(np);
+                            }
+                            break;
+                        case 11:
+                            /*
+                             * Check data for correct length
+                             * A short packet needs 56 bits/7 bytes/14 nibbles
+                             */
+                            if (data.length() < 14) {
+                                System.out.println("DF11 Error " + data.length() + " Hex Length");
+                                break;
+                            }
 
-                                if (df16.getBDS() == 0x30) {   // BDS 3,0
-                                    data56 = df16.getData56();
-                                    int data26 = (int)(data56 >>> 26);
+                            DownlinkFormat11 df11 = new DownlinkFormat11(data, detectTime);
+                            icao_number = df11.getICAO();
+
+                            if (df11.isValid()) {
+                                /*
+                                 * See if Target already exists
+                                 */
+                                try {
+                                    if (hasTarget(icao_number) == false) {
+                                        /*
+                                     * New Target
+                                         */
+                                        Track t = new Track(icao_number, false);  // false == not TIS
+                                        t.setRegistration(nconverter.icao_to_n(icao_number));
+                                        addTarget(icao_number, t);
+                                    }
+                                } catch (NullPointerException np) {
                                     /*
-                                     * Some planes send TTI = 0 which means nothing to do
+                                     * Not likely to occur
                                      */
-                                    if ((data26 & 0x3) != 0) {
-                                        insertTCASAlert(acid, data56, detectTime);
+                                    System.err.println(np);
+                                    break;
+                                }
+
+                                updateTargetAmplitude(icao_number, amplitude, detectTime);
+
+                                radarIID = df11.getRadarIID();
+                                si = df11.getRadarSI();
+                                updateTargetRadarID(icao_number, radarIID, si, detectTime);
+
+                                isOnGround = df11.getIsOnGround();
+                                updateTargetOnGround(icao_number, isOnGround, detectTime);
+                            }
+                            break;
+                        case 16:
+                            /*
+                             * Check data for correct length
+                             * A short packet needs 56 bits/7 bytes/14 nibbles
+                             */
+                            if (data.length() < 14) {
+                                System.out.println("DF16 Error " + data.length() + " Hex Length");
+                                break;
+                            }
+
+                            DownlinkFormat16 df16 = new DownlinkFormat16(data, detectTime);
+                            icao_number = df16.getICAO();
+
+                            try {
+                                if (hasTarget(icao_number)) {
+                                    isOnGround = df16.getIsOnGround();
+                                    altitude = df16.getAltitude();
+
+                                    updateTargetAmplitude(icao_number, amplitude, detectTime);
+                                    updateTargetAltitudeDF16(icao_number, altitude, detectTime);
+                                    updateTargetOnGround(icao_number, isOnGround, detectTime);
+
+                                    if (df16.getBDS() == 0x30) {   // BDS 3,0
+                                        data56 = df16.getData56();
+                                        int data30 = (int) (data56 >>> 26);
+                                        /*
+                                         * Some planes send TTI = 0 which means nothing to do
+                                         */
+                                        if ((data30 & 0x3) != 0) {
+                                            insertTCASAlert(icao_number, data56, detectTime);
+                                        }
                                     }
                                 }
-                            }
-                        } catch (NullPointerException np) {
-                            /*
-                             * Not likely to occur
-                             */
-                            System.err.println(np);
-                        }
-                        break;
-                    case 17:
-                        /*
-                         * Check data for correct length
-                         * A long packet needs 112 bits/14 bytes/28 nibbles
-                         */
-                        if (data.length() < 28) {
-                            System.out.println("DF17 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
-
-                        DownlinkFormat17 df17 = new DownlinkFormat17(data, detectTime, pm);
-                        acid = df17.getACID();
-
-                        if (df17.isValid() == true) { // CRC passed
-                            /*
-                             * See if Target already exists
-                             */
-                            try {
-                                if (hasTarget(acid) == false) {
-                                    /*
-                                     * New Target
-                                     */
-                                    Track t = new Track(acid, false);  // false == not TIS
-                                    t.setRegistration(nconverter.icao_to_n(acid));
-                                    addTarget(acid, t);
-                                }
                             } catch (NullPointerException np) {
                                 /*
                                  * Not likely to occur
                                  */
                                 System.err.println(np);
+                            }
+                            break;
+                        case 17:
+                            /*
+                             * Check data for correct length
+                             * A long packet needs 112 bits/14 bytes/28 nibbles
+                             */
+                            if (data.length() < 28) {
+                                System.out.println("DF17 Error " + data.length() + " Hex Length");
                                 break;
                             }
 
-                            updateTargetAmplitude(acid, amplitude, detectTime);
+                            DownlinkFormat17 df17 = new DownlinkFormat17(data, detectTime, pm);
+                            icao_number = df17.getICAO();
 
-                            switch (df17.getFormatType()) {
-                                case 0:
-                                    // No position information (may have baro alt)
+                            if (df17.isValid() == true) { // CRC passed
+                                /*
+                                 * See if Target already exists
+                                 */
+                                try {
+                                    if (hasTarget(icao_number) == false) {
+                                        /*
+                                         * New Target
+                                         */
+                                        Track t = new Track(icao_number, false);  // false == not TIS
+                                        t.setRegistration(nconverter.icao_to_n(icao_number));
+                                        addTarget(icao_number, t);
+                                    }
+                                } catch (NullPointerException np) {
+                                    /*
+                                     * Not likely to occur
+                                     */
+                                    System.err.println(np);
                                     break;
-                                case 1: // Cat D
-                                case 2: // Cat C
-                                case 3: // Cat B
-                                case 4: // Cat A
+                                }
 
-                                    // Identification and Category Type
-                                    category = df17.getCategory();
-                                    callsign = df17.getCallsign();
+                                updateTargetAmplitude(icao_number, amplitude, detectTime);
 
-                                    updateTargetCallsign(acid, callsign, category, detectTime);
-                                    break;
-                                case 5:
-                                case 6:
-                                case 7:
-                                case 8:
-                                    // Surface Position
+                                switch (df17.getFormatType()) {
+                                    case 0:
+                                        // No position information (may have baro alt)
+                                        break;
+                                    case 1: // Cat D
+                                    case 2: // Cat C
+                                    case 3: // Cat B
+                                    case 4: // Cat A
 
-                                    isOnGround = df17.getIsOnGround();
-                                    emergency = df17.getIsEmergency();
-                                    alert = df17.getIsAlert();
-                                    spi = df17.getIsSPI();
+                                        // Identification and Category Type
+                                        category = df17.getCategory();
+                                        callsign = df17.getCallsign();
 
-                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-                                    break;
-                                case 9:
-                                case 10:
-                                case 11:
-                                case 12:
-                                case 13:
-                                case 14:
-                                case 15:
-                                case 16:
-                                case 17:
-                                case 18:
-                                    // Airborne Position with barometric altitude
-                                    isOnGround = df17.getIsOnGround();
-                                    emergency = df17.getIsEmergency();
-                                    alert = df17.getIsAlert();
-                                    spi = df17.getIsSPI();
+                                        updateTargetCallsign(icao_number, callsign, category, detectTime);
+                                        break;
+                                    case 5:
+                                    case 6:
+                                    case 7:
+                                    case 8:
+                                        // Surface Position
 
-                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
+                                        isOnGround = df17.getIsOnGround();
+                                        emergency = df17.getIsEmergency();
+                                        alert = df17.getIsAlert();
+                                        spi = df17.getIsSPI();
 
-                                    altitude = df17.getAltitude();
-                                    updateTargetAltitudeDF17(acid, altitude, detectTime);
+                                        updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                        break;
+                                    case 9:
+                                    case 10:
+                                    case 11:
+                                    case 12:
+                                    case 13:
+                                    case 14:
+                                    case 15:
+                                    case 16:
+                                    case 17:
+                                    case 18:
+                                        // Airborne Position with barometric altitude
+                                        isOnGround = df17.getIsOnGround();
+                                        emergency = df17.getIsEmergency();
+                                        alert = df17.getIsAlert();
+                                        spi = df17.getIsSPI();
 
-                                    break;
-                                case 19:
-                                    subtype3 = df17.getSubType();
+                                        updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
 
-                                    switch (subtype3) {
-                                        case 1:     // gndspeed normal lsb=1knot
-                                        case 2:     // gndspeed supersonic lsb=4knots
-                                            groundSpeed = df17.getGroundSpeed();
-                                            trueHeading = df17.getTrueHeading();
-                                            vSpeed = df17.getVspeed();
+                                        altitude = df17.getAltitude();
+                                        updateTargetAltitudeDF17(icao_number, altitude, detectTime);
 
-                                            if (trueHeading != -1.0) {
-                                                updateTargetGroundSpeedTrueHeading(acid, groundSpeed, trueHeading, vSpeed, detectTime);
-                                            }
-                                            break;
-                                        case 3: // subsonic
-                                        case 4: // supersonic
+                                        break;
+                                    case 19:
+                                        subtype3 = df17.getSubType();
 
-                                            // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
-                                            if (df17.getMagneticFlag()) {
-                                                magneticHeading = df17.getMagneticHeading();
-                                                airspeed = df17.getAirspeed();
+                                        switch (subtype3) {
+                                            case 1:     // gndspeed normal lsb=1knot
+                                            case 2:     // gndspeed supersonic lsb=4knots
+                                                groundSpeed = df17.getGroundSpeed();
+                                                trueHeading = df17.getTrueHeading();
                                                 vSpeed = df17.getVspeed();
 
-                                                if (df17.getTasFlag() == false) {
-                                                    updateTargetMagneticHeadingIAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
-                                                } else {
-                                                    updateTargetMagneticHeadingTAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                                if (trueHeading != -1.0) {
+                                                    updateTargetGroundSpeedTrueHeading(icao_number, groundSpeed, trueHeading, vSpeed, detectTime);
                                                 }
-                                            }
-                                    }
-                            }
-                        }
-                        break;
-                    case 18:
-                        /*
-                         * Check data for correct length
-                         * A long packet needs 112 bits/14 bytes/28 nibbles
-                         */
-                        if (data.length() < 28) {
-                            System.out.println("DF18 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
+                                                break;
+                                            case 3: // subsonic
+                                            case 4: // supersonic
 
-                        DownlinkFormat18 df18 = new DownlinkFormat18(data, detectTime, pm);
-                        acid = df18.getACID();
+                                                // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
+                                                if (df17.getMagneticFlag()) {
+                                                    magneticHeading = df17.getMagneticHeading();
+                                                    airspeed = df17.getAirspeed();
+                                                    vSpeed = df17.getVspeed();
 
-                        if (df18.isValid() == true) { // Passed CRC
-                            /*
-                             * See if Target already exists
-                             */
-                            try {
-                                if (hasTarget(acid) == false) {
-                                    /*
-                                     * New Target
-                                     */
-                                    Track t = new Track(acid, true);  // true == TIS
-
-                                    t.setRegistration(nconverter.icao_to_n(acid));
-                                    addTarget(acid, t);
-                                }
-                            } catch (NullPointerException np) {
-                                /*
-                                 * Not likely to occur
-                                 */
-                                System.err.println(np);
-                            }
-
-                            updateTargetAmplitude(acid, amplitude, detectTime);
-                            
-                            switch (df18.getFormatType()) {
-                                case 0:
-                                    // No position information (may have baro alt)
-                                    break;
-                                case 1: // Cat D
-                                case 2: // Cat C
-                                case 3: // Cat B
-                                case 4: // Cat A
-
-                                    // Identification and Category Type
-                                    category = df18.getCategory();
-                                    callsign = df18.getCallsign();
-
-                                    updateTargetCallsign(acid, callsign, category, detectTime);
-                                    break;
-                                case 5:
-                                case 6:
-                                case 7:
-                                case 8:
-                                    // Surface Position
-
-                                    isOnGround = df18.getIsOnGround();
-                                    emergency = df18.getIsEmergency();
-                                    alert = df18.getIsAlert();
-                                    spi = df18.getIsSPI();
-
-                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-                                    break;
-                                case 9:
-                                case 10:
-                                case 11:
-                                case 12:
-                                case 13:
-                                case 14:
-                                case 15:
-                                case 16:
-                                case 17:
-                                case 18:
-                                    // Airborne Position with barometric altitude
-                                    isOnGround = df18.getIsOnGround();
-                                    emergency = df18.getIsEmergency();
-                                    alert = df18.getIsAlert();
-                                    spi = df18.getIsSPI();
-
-                                    updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-
-                                    altitude = df18.getAltitude();
-                                    updateTargetAltitudeDF18(acid, altitude, detectTime);
-                                    break;
-                                case 19:
-                                    subtype3 = df18.getSubType();
-
-                                    switch (subtype3) {
-                                        case 1:     // gndspeed normal lsb=1knot
-                                        case 2:     // gndspeed supersonic lsb=4knots
-                                            groundSpeed = df18.getGroundSpeed();
-                                            trueHeading = df18.getTrueHeading();
-                                            vSpeed = df18.getVspeed();
-
-                                            if (!(Float.compare(trueHeading, -1.0f) == 0)) {
-                                                updateTargetGroundSpeedTrueHeading(acid, groundSpeed, trueHeading, vSpeed, detectTime);
-                                            }
-                                            break;
-                                        case 3: // subsonic
-                                        case 4: // supersonic
-
-                                            // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
-                                            if (df18.getMagneticFlag()) {
-                                                magneticHeading = df18.getMagneticHeading();
-                                                airspeed = df18.getAirspeed();
-                                                vSpeed = df18.getVspeed();
-
-                                                if (df18.getTasFlag() == false) {
-                                                    updateTargetMagneticHeadingIAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
-                                                } else {
-                                                    updateTargetMagneticHeadingTAS(acid, magneticHeading, airspeed, vSpeed, detectTime);
+                                                    if (df17.getTasFlag() == false) {
+                                                        updateTargetMagneticHeadingIAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                    } else {
+                                                        updateTargetMagneticHeadingTAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                    }
                                                 }
-                                            }
-                                    }
-                            }
-                        }
-                        break;
-                    case 19: // Military Squitter
-                        break;
-                    case 20:
-                        /*
-                         * Check data for correct length
-                         * A long packet needs 112 bits/14 bytes/28 nibbles
-                         */
-                        if (data.length() < 28) {
-                            System.out.println("DF20 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
-                        
-                        DownlinkFormat20 df20 = new DownlinkFormat20(data, detectTime);
-                        acid = df20.getACID();
-
-                        try {
-                            if (hasTarget(acid)) {
-                                altitude = df20.getAltitude();
-                                isOnGround = df20.getIsOnGround();
-                                emergency = df20.getIsEmergency();
-                                alert = df20.getIsAlert();
-                                spi = df20.getIsSPI();
-
-                                updateTargetAmplitude(acid, amplitude, detectTime);
-                                updateTargetAltitudeDF20(acid, altitude, detectTime);
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-
-                                int bds = df20.getBDS();
-                                data56 = df20.getData56();
-
-                                if (bds == 0x20) {             // BDS 2,0
-                                    callsign = df20.getCallsign();
-                                    updateTargetCallsign(acid, callsign, detectTime);
-                                } else if (bds == 0x30) {      // BDS 3,0
-                                    /*
-                                     * Some planes send Zero's for some damned reason
-                                     */
-                                    if (data56 != 30000000000000L) {
-                                        insertTCASAlert(acid, data56, detectTime);
-                                    }
-                                }
-                            }
-                        } catch (NullPointerException np) {
-                            /*
-                             * Not likely to occur
-                             */
-                            System.err.println(np);
-                        }
-                        break;
-                    case 21:
-                        /*
-                         * Check data for correct length
-                         * A long packet needs 112 bits/14 bytes/28 nibbles
-                         */
-                        if (data.length() < 28) {
-                            System.out.println("DF21 Error " + data.length()  + " Hex Length");
-                            break;
-                        }
-
-                        DownlinkFormat21 df21 = new DownlinkFormat21(data, detectTime);
-                        acid = df21.getACID();
-
-                        try {
-                            if (hasTarget(acid)) {
-                                squawk = df21.getSquawk();
-                                isOnGround = df21.getIsOnGround();
-                                emergency = df21.getIsEmergency();
-                                alert = df21.getIsAlert();
-                                spi = df21.getIsSPI();
-
-                                updateTargetAmplitude(acid, amplitude, detectTime);
-                                updateTargetSquawk(acid, squawk, detectTime);
-                                updateTargetBoolean(acid, isOnGround, emergency, alert, spi, detectTime);
-
-                                int bds = df21.getBDS();
-                                data56 = df21.getData56();
-
-                                switch (bds) {      // Bunch more available for decode
-                                    case 0x20:      // BDS 2,0 Callsign
-                                        callsign = df21.getCallsign();
-                                        updateTargetCallsign(acid, callsign, detectTime);
-                                        break;
-                                    case 0x30:      // BDS 3,0 TCAS
-                                        /*
-                                         * Some planes send Zero's for some damned reason
-                                         */
-                                        if ((data56 & 0x0FFFFFFFFFFFFFL) != 0) {    // 52-Bits all zero
-                                            insertTCASAlert(acid, data56, detectTime);
                                         }
                                 }
                             }
-                        } catch (NullPointerException np) {
+                            break;
+                        case 18:
                             /*
-                             * Not likely to occur
+                             * Check data for correct length
+                             * A long packet needs 112 bits/14 bytes/28 nibbles
                              */
-                            System.err.println(np);
-                        }
-                        break;
-                    default:
-                        System.err.printf("DataBlockParser::decodeData DF: [%d] %s%n", df5, data);
+                            if (data.length() < 28) {
+                                System.out.println("DF18 Error " + data.length() + " Hex Length");
+                                break;
+                            }
+
+                            DownlinkFormat18 df18 = new DownlinkFormat18(data, detectTime, pm);
+                            icao_number = df18.getICAO();
+
+                            if (df18.isValid() == true) { // Passed CRC
+                                /*
+                                 * See if Target already exists
+                                 */
+                                try {
+                                    if (hasTarget(icao_number) == false) {
+                                        /*
+                                         * New Target
+                                         */
+                                        Track t = new Track(icao_number, true);  // true == TIS
+
+                                        t.setRegistration(nconverter.icao_to_n(icao_number));
+                                        addTarget(icao_number, t);
+                                    }
+                                } catch (NullPointerException np) {
+                                    /*
+                                     * Not likely to occur
+                                     */
+                                    System.err.println(np);
+                                }
+
+                                updateTargetAmplitude(icao_number, amplitude, detectTime);
+
+                                switch (df18.getFormatType()) {
+                                    case 0:
+                                        // No position information (may have baro alt)
+                                        break;
+                                    case 1: // Cat D
+                                    case 2: // Cat C
+                                    case 3: // Cat B
+                                    case 4: // Cat A
+
+                                        // Identification and Category Type
+                                        category = df18.getCategory();
+                                        callsign = df18.getCallsign();
+
+                                        updateTargetCallsign(icao_number, callsign, category, detectTime);
+                                        break;
+                                    case 5:
+                                    case 6:
+                                    case 7:
+                                    case 8:
+                                        // Surface Position
+
+                                        isOnGround = df18.getIsOnGround();
+                                        emergency = df18.getIsEmergency();
+                                        alert = df18.getIsAlert();
+                                        spi = df18.getIsSPI();
+
+                                        updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                        break;
+                                    case 9:
+                                    case 10:
+                                    case 11:
+                                    case 12:
+                                    case 13:
+                                    case 14:
+                                    case 15:
+                                    case 16:
+                                    case 17:
+                                    case 18:
+                                        // Airborne Position with barometric altitude
+                                        isOnGround = df18.getIsOnGround();
+                                        emergency = df18.getIsEmergency();
+                                        alert = df18.getIsAlert();
+                                        spi = df18.getIsSPI();
+
+                                        updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+
+                                        altitude = df18.getAltitude();
+                                        updateTargetAltitudeDF18(icao_number, altitude, detectTime);
+                                        break;
+                                    case 19:
+                                        subtype3 = df18.getSubType();
+
+                                        switch (subtype3) {
+                                            case 1:     // gndspeed normal lsb=1knot
+                                            case 2:     // gndspeed supersonic lsb=4knots
+                                                groundSpeed = df18.getGroundSpeed();
+                                                trueHeading = df18.getTrueHeading();
+                                                vSpeed = df18.getVspeed();
+
+                                                if (!(Float.compare(trueHeading, -1.0f) == 0)) {
+                                                    updateTargetGroundSpeedTrueHeading(icao_number, groundSpeed, trueHeading, vSpeed, detectTime);
+                                                }
+                                                break;
+                                            case 3: // subsonic
+                                            case 4: // supersonic
+
+                                                // Decode Heading and Airspeed, Groundspeed/TrueHeading is not known
+                                                if (df18.getMagneticFlag()) {
+                                                    magneticHeading = df18.getMagneticHeading();
+                                                    airspeed = df18.getAirspeed();
+                                                    vSpeed = df18.getVspeed();
+
+                                                    if (df18.getTasFlag() == false) {
+                                                        updateTargetMagneticHeadingIAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                    } else {
+                                                        updateTargetMagneticHeadingTAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                    }
+                                                }
+                                        }
+                                }
+                            }
+                            break;
+                        case 19: // Military Squitter
+                            break;
+                        case 20:
+                            /*
+                             * Check data for correct length
+                             * A long packet needs 112 bits/14 bytes/28 nibbles
+                             */
+                            if (data.length() < 28) {
+                                System.out.println("DF20 Error " + data.length() + " Hex Length");
+                                break;
+                            }
+
+                            DownlinkFormat20 df20 = new DownlinkFormat20(data, detectTime);
+                            icao_number = df20.getICAO();
+
+                            try {
+                                if (hasTarget(icao_number)) {
+                                    altitude = df20.getAltitude();
+                                    isOnGround = df20.getIsOnGround();
+                                    emergency = df20.getIsEmergency();
+                                    alert = df20.getIsAlert();
+                                    spi = df20.getIsSPI();
+
+                                    updateTargetAmplitude(icao_number, amplitude, detectTime);
+                                    updateTargetAltitudeDF20(icao_number, altitude, detectTime);
+                                    updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+
+                                    int bds = df20.getBDS();
+                                    data56 = df20.getData56();
+
+                                    if (bds == 0x20) {             // BDS 2,0
+                                        callsign = df20.getCallsign();
+                                        updateTargetCallsign(icao_number, callsign, detectTime);
+                                    } else if (bds == 0x30) {      // BDS 3,0
+                                        int data30 = (int) (data56 >>> 26);
+                                        /*
+                                         * Some planes send TTI = 0 which means nothing to do
+                                         */
+                                        if ((data30 & 0x3) != 0) {
+                                            insertTCASAlert(icao_number, data56, detectTime);
+                                        }
+                                    }
+                                }
+                            } catch (NullPointerException np) {
+                                /*
+                                 * Not likely to occur
+                                 */
+                                System.err.println(np);
+                            }
+                            break;
+                        case 21:
+                            /*
+                             * Check data for correct length
+                             * A long packet needs 112 bits/14 bytes/28 nibbles
+                             */
+                            if (data.length() < 28) {
+                                System.out.println("DF21 Error " + data.length() + " Hex Length");
+                                break;
+                            }
+
+                            DownlinkFormat21 df21 = new DownlinkFormat21(data, detectTime);
+                            icao_number = df21.getICAO();
+
+                            try {
+                                if (hasTarget(icao_number)) {
+                                    squawk = df21.getSquawk();
+                                    isOnGround = df21.getIsOnGround();
+                                    emergency = df21.getIsEmergency();
+                                    alert = df21.getIsAlert();
+                                    spi = df21.getIsSPI();
+
+                                    updateTargetAmplitude(icao_number, amplitude, detectTime);
+                                    updateTargetSquawk(icao_number, squawk, detectTime);
+                                    updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+
+                                    int bds = df21.getBDS();
+                                    data56 = df21.getData56();
+
+                                    switch (bds) {      // Bunch more available for decode
+                                        case 0x20:      // BDS 2,0 Callsign
+                                            callsign = df21.getCallsign();
+                                            updateTargetCallsign(icao_number, callsign, detectTime);
+                                            break;
+                                        case 0x30:      // BDS 3,0 TCAS
+                                            int data30 = (int) (data56 >>> 26);
+                                            /*
+                                             * Some planes send TTI = 0 which means nothing to do
+                                             */
+                                            if ((data30 & 0x3) != 0) {
+                                                insertTCASAlert(icao_number, data56, detectTime);
+                                            }
+                                    }
+                                }
+                            } catch (NullPointerException np) {
+                                /*
+                                 * Not likely to occur
+                                 */
+                                System.err.println(np);
+                            }
+                            break;
+                        default:
+                            System.err.printf("DataBlockParser::decodeData DF: [%d] %s%n", df5, data);
+                    }
                 }
             } //  end of for-loop
 
@@ -1324,18 +1299,18 @@ public final class DataBlockParser extends Thread {
                         time = trk.getUpdatedTime();
                         trk.setUpdated(false);  // reset the updated boolean
 
-                        acid = trk.getAircraftID();
+                        icao_number = trk.getAircraftICAO();
 
                         /*
-                         * See if this ACID exists yet in the target table, and
+                         * See if this ICAO exists yet in the target table, and
                          * has our radar ID. If it does, we can do an update, and
                          * if not we will do an insert.
                          */
                         try {
-                            queryString = String.format("SELECT count(*) AS TC FROM target WHERE acid='%s' AND radar_id=%d",
-                                    acid, radarid);
+                            queryString = String.format("SELECT count(*) AS TC FROM target_table WHERE icao_number='%s' AND radar_site=%d",
+                                    icao_number, radar_site);
 
-                            query = db1.createStatement();
+                            query = db.createStatement();
                             rs = query.executeQuery(queryString);
 
                             if (rs.next() == true) {
@@ -1364,10 +1339,10 @@ public final class DataBlockParser extends Thread {
                         }
 
                         if (exists > 0) {         // target exists
-                            queryString = String.format("UPDATE target SET utcupdate=%d,"
+                            queryString = String.format("UPDATE target_table SET utcupdate=%d,"
                                     + "amplitude=%d,"
-                                    + "radariid=NULLIF(%d, -99),"
-                                    + "si=%d,"
+                                    + "radar_iid=NULLIF(%d, -99),"
+                                    + "radar_si=%d,"
                                     + "altitude=NULLIF(%d, -9999),"
                                     + "altitudedf00=NULLIF(%d, -9999),"
                                     + "altitudedf04=NULLIF(%d, -9999),"
@@ -1395,11 +1370,11 @@ public final class DataBlockParser extends Thread {
                                     + "hadAlert=%d,"
                                     + "hadEmergency=%d,"
                                     + "hadSPI=%d"
-                                    + " WHERE acid='%s' AND radar_id=%d",
+                                    + " WHERE icao_number='%s' AND radar_site=%d",
                                     time,
                                     trk.getAmplitude(),
                                     trk.getRadarIID(),
-                                    trk.getSI() ? 1 : 0,
+                                    trk.getRadarSI() ? 1 : 0,
                                     trk.getAltitude(),
                                     trk.getAltitudeDF00(),
                                     trk.getAltitudeDF04(),
@@ -1427,17 +1402,17 @@ public final class DataBlockParser extends Thread {
                                     trk.getHadAlert() ? 1 : 0,
                                     trk.getHadEmergency() ? 1 : 0,
                                     trk.getHadSPI() ? 1 : 0,
-                                    acid,
-                                    radarid);
+                                    icao_number,
+                                    radar_site);
                         } else {                // target doesn't exist
-                            queryString = String.format("INSERT INTO target ("
-                                    + "acid,"
-                                    + "radar_id,"
+                            queryString = String.format("INSERT INTO target_table ("
+                                    + "icao_number,"
+                                    + "radar_site,"
                                     + "utcdetect,"
                                     + "utcupdate,"
                                     + "amplitude,"
-                                    + "radariid,"
-                                    + "si,"
+                                    + "radar_iid,"
+                                    + "radar_si,"
                                     + "altitude,"
                                     + "altitudedf00,"
                                     + "altitudedf04,"
@@ -1486,13 +1461,13 @@ public final class DataBlockParser extends Thread {
                                     + "%d,"
                                     + "'%s',"
                                     + "%d,%d,%d,%d,%d,%d,%d,%d,%d)",
-                                    acid,
-                                    radarid,
+                                    icao_number,
+                                    radar_site,
                                     time,
                                     time,
                                     trk.getAmplitude(),
                                     trk.getRadarIID(),
-                                    trk.getSI() ? 1 : 0,
+                                    trk.getRadarSI() ? 1 : 0,
                                     trk.getAltitude(),
                                     trk.getAltitudeDF00(),
                                     trk.getAltitudeDF04(),
@@ -1523,12 +1498,12 @@ public final class DataBlockParser extends Thread {
                         }
 
                         try {
-                            query = db1.createStatement();
+                            query = db.createStatement();
                             query.executeUpdate(queryString);
                             query.close();
                         } catch (SQLException e5) {
                             query.close();
-                            System.out.println("DataBlockParser::run query target Error: " + queryString + " " + e5.getMessage());
+                            System.out.println("DataBlockParser::run insert/update target_table Error: " + queryString + " " + e5.getMessage());
                         }
 
                         if (trk.getUpdatePosition() == true) {
@@ -1537,39 +1512,39 @@ public final class DataBlockParser extends Thread {
                             // Safety check, we don't want NULL's
                             // TODO: Figure out why we get those
                             if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
-                                queryString = String.format("INSERT INTO targetecho ("
+                                queryString = String.format("INSERT INTO target_echo ("
                                         + "flight_id,"
-                                        + "radar_id,"
-                                        + "acid,"
+                                        + "radar_site,"
+                                        + "icao_number,"
                                         + "utcdetect,"
                                         + "amplitude,"
-                                        + "radariid,"
-                                        + "si,"
+                                        + "radar_iid,"
+                                        + "radar_si,"
                                         + "latitude,"
                                         + "longitude,"
                                         + "altitude,"
                                         + "verticalTrend,"
                                         + "onground"
                                         + ") VALUES ("
-                                        + "(SELECT flight_id FROM target WHERE acid='%s' AND radar_id=%d),"
+                                        + "(SELECT flight_id FROM target_table WHERE icao_number='%s' AND radar_site=%d),"
                                         + "%d,"
                                         + "'%s',"
                                         + "%d,"
                                         + "%d,"     // amplitude
-                                        + "NULLIF(%d, -99), %d," // radariid & si
+                                        + "NULLIF(%d, -99), %d," // radariid & radarsi
                                         + "%f,"
                                         + "%f,"
                                         + "%d,"
                                         + "%d,"
                                         + "%d)",
-                                        acid,
-                                        radarid,
-                                        radarid,
-                                        acid,
+                                        icao_number,
+                                        radar_site,
+                                        radar_site,
+                                        icao_number,
                                         time,
                                         trk.getAmplitude(),
                                         trk.getRadarIID(),
-                                        trk.getSI() ? 1 : 0,
+                                        trk.getRadarSI() ? 1 : 0,
                                         trk.getLatitude(),
                                         trk.getLongitude(),
                                         trk.getAltitude(),
@@ -1577,12 +1552,12 @@ public final class DataBlockParser extends Thread {
                                         ground);
 
                                 try {
-                                    query = db1.createStatement();
+                                    query = db.createStatement();
                                     query.executeUpdate(queryString);
                                     query.close();
                                 } catch (SQLException e6) {
                                     query.close();
-                                    System.out.println("DataBlockParser::run query targetecho Error: " + queryString + " " + e6.getMessage());
+                                    System.out.println("DataBlockParser::run query target_echo Error: " + queryString + " " + e6.getMessage());
                                 }
                             }
                         }
@@ -1590,10 +1565,10 @@ public final class DataBlockParser extends Thread {
                         if (trk.getRegistration().equals("") == false) {
                             try {
 
-                                queryString = String.format("SELECT count(*) AS RG FROM modestable"
-                                        + " WHERE acid='%s'", acid);
+                                queryString = String.format("SELECT count(*) AS RG FROM icao_table"
+                                        + " WHERE icao_number='%s'", icao_number);
 
-                                query = db1.createStatement();
+                                query = db.createStatement();
                                 rs = query.executeQuery(queryString);
 
                                 if (rs.next() == true) {
@@ -1607,17 +1582,16 @@ public final class DataBlockParser extends Thread {
                             } catch (SQLException e7) {
                                 rs.close();
                                 query.close();
-                                System.out.println("DataBlockParser::run query modestable warn: " + queryString + " " + e7.getMessage());
+                                System.out.println("DataBlockParser::run query icao_table warn: " + queryString + " " + e7.getMessage());
                                 continue;   // skip the following
                             }
 
                             if (exists > 0) {
-                                queryString = String.format("UPDATE modestable SET acft_reg='%s',utcupdate=%d WHERE acid='%s'",
+                                queryString = String.format("UPDATE icao_table SET registration='%s' WHERE icao_number='%s'",
                                         trk.getRegistration(),
-                                        time,
-                                        acid);
+                                        icao_number);
 
-                                query = db1.createStatement();
+                                query = db.createStatement();
                                 query.executeUpdate(queryString);
                                 query.close();
                             }
@@ -1626,11 +1600,11 @@ public final class DataBlockParser extends Thread {
                         if (trk.getCallsign().equals("") == false) {
                             try {
 
-                                queryString = String.format("SELECT count(*) AS CS FROM callsign"
-                                        + " WHERE callsign='%s' AND acid='%s' AND radar_id=%d",
-                                        trk.getCallsign(), acid, radarid);
+                                queryString = String.format("SELECT count(*) AS CS FROM callsign_table"
+                                        + " WHERE callsign='%s' AND icao_number='%s' AND radar_site=%d",
+                                        trk.getCallsign(), icao_number, radar_site);
 
-                                query = db1.createStatement();
+                                query = db.createStatement();
                                 rs = query.executeQuery(queryString);
 
                                 if (rs.next() == true) {
@@ -1644,28 +1618,28 @@ public final class DataBlockParser extends Thread {
                             } catch (SQLException e8) {
                                 rs.close();
                                 query.close();
-                                System.out.println("DataBlockParser::run query callsign warn: " + queryString + " " + e8.getMessage());
+                                System.out.println("DataBlockParser::run query callsign_table warn: " + queryString + " " + e8.getMessage());
                                 continue;   // skip the following
                             }
 
                             if (exists > 0) {
-                                queryString = String.format("UPDATE callsign SET utcupdate=%d WHERE callsign='%s' AND acid='%s' AND radar_id=%d",
-                                        time, trk.getCallsign(), acid, radarid);
+                                queryString = String.format("UPDATE callsign_table SET utcupdate=%d WHERE callsign='%s' AND icao_number='%s' AND radar_site=%d",
+                                        time, trk.getCallsign(), icao_number, radar_site);
                             } else {
-                                queryString = String.format("INSERT INTO callsign (callsign,flight_id,radar_id,acid,"
+                                queryString = String.format("INSERT INTO callsign_table (callsign,flight_id,radar_site,icao_number,"
                                         + "utcdetect,utcupdate) VALUES ('%s',"
-                                        + "(SELECT flight_id FROM target WHERE acid='%s' AND radar_id=%d),"
+                                        + "(SELECT flight_id FROM target_table WHERE icao_number='%s' AND radar_site=%d),"
                                         + "%d,'%s',%d,%d)",
                                         trk.getCallsign(),
-                                        acid,
-                                        radarid,
-                                        radarid,
-                                        acid,
+                                        icao_number,
+                                        radar_site,
+                                        radar_site,
+                                        icao_number,
                                         time,
                                         time);
                             }
 
-                            query = db1.createStatement();
+                            query = db.createStatement();
                             query.executeUpdate(queryString);
                             query.close();
                         }

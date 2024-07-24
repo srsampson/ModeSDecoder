@@ -18,7 +18,7 @@ public final class DownlinkFormat05 implements IDF05 {
     private int um6;
     private int ids2;
     private int iis4;
-    private String acid;
+    private String icao;
     private long timestamp;
     private boolean isOnGround;
     private boolean isAlert;
@@ -36,7 +36,7 @@ public final class DownlinkFormat05 implements IDF05 {
         sqk = new Squawk();
 
         timestamp = time;
-        acid = "";
+        icao = "";
         squawk = "";
 
         squawk = sqk.decodeSquawk(raw56.substring(0, 8));
@@ -48,7 +48,7 @@ public final class DownlinkFormat05 implements IDF05 {
          * This is effected by interference and garbled bits, so you have to
          * validate this ACID with the list of DF11,DF17, and DF18 packets.
          */
-        acid = crc.crcCompute(raw56);
+        icao = crc.crcCompute(raw56);
 
         fs3 = Integer.parseInt(raw56.substring(1, 2), 16) & 0x07;
         dr5 = ((Integer.parseInt(raw56.substring(2, 4), 16) & 0xF8) >>> 3) & 0x1F; // DR 5 bits
@@ -130,8 +130,8 @@ public final class DownlinkFormat05 implements IDF05 {
         return squawk;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     @Override

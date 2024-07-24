@@ -36,7 +36,7 @@ public final class DownlinkFormat18 implements IDF18 {
     //
     private String callsign;
     private String vspeedSource;
-    private String acid;
+    private String icao;
     //
     private boolean singleAntenna;
     private boolean timeSync;
@@ -73,7 +73,7 @@ public final class DownlinkFormat18 implements IDF18 {
         thead = new TrueHeading();
         call = new Callsign();
 
-        acid = "";
+        icao = "";
         callsign = "";
         altitude = -9999;
 
@@ -87,7 +87,7 @@ public final class DownlinkFormat18 implements IDF18 {
          * This is effected by interference and garbled bits, so you have to
          * validate this ACID with the ACID in hex digits 2 through 7.
          */
-        acid = raw112.substring(2, 8);
+        icao = raw112.substring(2, 8);
         crcValue = crc.crcCompute(raw112);  // 14 bytes, 28 hex nibbles
         valid = false;
 
@@ -248,7 +248,7 @@ public final class DownlinkFormat18 implements IDF18 {
                     lat17 = (int) (((data56 & 0x03FFFE0000L) >>> 17) & 0x01FFFFL);
                     lon17 = (int) (data56 & 0x01FFFFL);
 
-                    pm.addNewPosition(acid, lat17, lon17, timestamp, cpr1, true, true); // Surface Position
+                    pm.addNewPosition(icao, lat17, lon17, timestamp, cpr1, true, true); // Surface Position
                     break;
                 case 9:
                 case 10:
@@ -278,7 +278,7 @@ public final class DownlinkFormat18 implements IDF18 {
                     lat17 = (int) (((data56 & 0x03FFFE0000L) >>> 17) & 0x01FFFFL);
                     lon17 = (int) (data56 & 0x01FFFFL);
 
-                    pm.addNewPosition(acid, lat17, lon17, timestamp, cpr1, false, true);    // Airborne position
+                    pm.addNewPosition(icao, lat17, lon17, timestamp, cpr1, false, true);    // Airborne position
                     break;
                 case 19:
                     // Airborne Velocity (has SubTypes)
@@ -475,8 +475,8 @@ public final class DownlinkFormat18 implements IDF18 {
         return magneticHeading;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     @Override

@@ -35,7 +35,7 @@ public interface IPosition {
 
     public void setProcessTime(long val);
 
-    public String getACID();
+    public String getICAO();
 
     public long getUpdateTime();
 

@@ -19,7 +19,7 @@ public final class DownlinkFormat20 implements IDF20 {
     private int um6;
     private int ids2;
     private int iis4;
-    private String acid;
+    private String icao;
     private String callsign;
     private long timestamp;
     private final long data56;
@@ -41,7 +41,7 @@ public final class DownlinkFormat20 implements IDF20 {
         crc = new CRC();
         call = new Callsign();
         dataBytes = new int[7];
-        acid = "";
+        icao = "";
         callsign = "";
         altitude = -9999;
 
@@ -55,7 +55,7 @@ public final class DownlinkFormat20 implements IDF20 {
          * This is effected by interference and garbled bits, so you have to
          * validate this ACID with the list of DF11,DF17, and DF18 packets.
          */
-        acid = crc.crcCompute(raw112);
+        icao = crc.crcCompute(raw112);
 
         fs3 = Integer.parseInt(raw112.substring(1, 2), 16) & 0x07;
         dr5 = ((Integer.parseInt(raw112.substring(2, 4), 16) & 0xF8) >>> 3) & 0x1F; // DR 5 bits
@@ -165,8 +165,8 @@ public final class DownlinkFormat20 implements IDF20 {
         return isEmergency;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     @Override

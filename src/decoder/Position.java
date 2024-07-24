@@ -5,7 +5,7 @@ package decoder;
 
 public final class Position implements IPosition, IConstants {
 
-    private final String acid;        // aircraft ID
+    private final String icao;        // ICAO ID
     //
     private long utctime;             // last update time (even or odd)
     private long ptime;               // processing time abs(evenframe - oddframe)
@@ -22,7 +22,7 @@ public final class Position implements IPosition, IConstants {
     // Constructor
     public Position(String ac, long time, int lat, int lon, boolean cpr1) {
         timedout = false;
-        acid = ac;
+        icao = ac;
         ptime = 0L;
         utctime = time;
 
@@ -79,8 +79,8 @@ public final class Position implements IPosition, IConstants {
     }
 
     @Override
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     @Override

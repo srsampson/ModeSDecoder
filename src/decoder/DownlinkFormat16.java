@@ -15,7 +15,7 @@ public final class DownlinkFormat16 implements IDF16 {
     private int altitude;
     private final int ri4;
     private final long timestamp;
-    private String acid;
+    private String icao;
     private boolean crosslinkCapable;
     private final boolean isOnGround;
     private final boolean cc1;
@@ -33,7 +33,7 @@ public final class DownlinkFormat16 implements IDF16 {
         crc = new CRC();
         alt = new Altitude();
         dataBytes = new int[7];
-        acid = "";
+        icao = "";
         altitude = -9999;
 
         timestamp = time;
@@ -46,7 +46,7 @@ public final class DownlinkFormat16 implements IDF16 {
          * This is effected by interference and garbled bits, so you have to
          * validate this ACID with the list of DF11,DF17, and DF18 packets.
          */
-        acid = crc.crcCompute(raw56);
+        icao = crc.crcCompute(raw56);
 
         /*
          * The second hex digit is the vs1 and cc1 bits 0XX0
@@ -122,8 +122,8 @@ public final class DownlinkFormat16 implements IDF16 {
         return altitude;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     public long getTimestamp() {

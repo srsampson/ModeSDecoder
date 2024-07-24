@@ -16,7 +16,7 @@ public final class DownlinkFormat11 implements IDF11 {
     private int cl3;
     private final int ca3;
     private final String raw56;
-    private String acid;
+    private String icao;
     private final String crcValue;
     private final long timestamp;
     private boolean isSIcode;
@@ -34,7 +34,7 @@ public final class DownlinkFormat11 implements IDF11 {
         raw56 = raw;
         timestamp = time;
         isSIcode = false;
-        acid = "";
+        icao = "";
 
         /*
          * First we determine if this is a broadcast squitter from an aircraft,
@@ -45,7 +45,7 @@ public final class DownlinkFormat11 implements IDF11 {
          * The CL code (bits 50-52) come first and is 3 bits, then comes the IC
          * code (53-56) which is 4 bits.
          */
-        acid = raw56.substring(2, 8);
+        icao = raw56.substring(2, 8);
         crcValue = crc.crcCompute(raw56); // 7 bytes 14 hex nibbles
 
         isOnGround = false;
@@ -98,7 +98,7 @@ public final class DownlinkFormat11 implements IDF11 {
     }
 
     @Override
-    public boolean getSI() {
+    public boolean getRadarSI() {
         return isSIcode;
     }
 
@@ -112,8 +112,8 @@ public final class DownlinkFormat11 implements IDF11 {
         return isOnGround;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     @Override

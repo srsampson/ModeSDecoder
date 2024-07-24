@@ -19,7 +19,7 @@ public final class DownlinkFormat21 implements IDF21 {
     private int um6;
     private int ids2;
     private int iis4;
-    private String acid;
+    private String icao;
     private String callsign;
     private long timestamp;
     private final long data56;
@@ -45,7 +45,7 @@ public final class DownlinkFormat21 implements IDF21 {
 
         timestamp = time;
         squawk = "";    // just in case decode fails
-        acid = "";
+        icao = "";
 
         squawk = sqk.decodeSquawk(raw112.substring(0, 8));
 
@@ -56,7 +56,7 @@ public final class DownlinkFormat21 implements IDF21 {
          * This is effected by interference and garbled bits, so you have to
          * validate this ACID with the list of DF11,DF17, and DF18 packets.
          */
-        acid = crc.crcCompute(raw112);
+        icao = crc.crcCompute(raw112);
 
         fs3 = Integer.parseInt(raw112.substring(1, 2), 16) & 0x07;
         dr5 = ((Integer.parseInt(raw112.substring(2, 4), 16) & 0xF8) >>> 3) & 0x1F; // DR 5 bits
@@ -171,8 +171,8 @@ public final class DownlinkFormat21 implements IDF21 {
         return squawk;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     @Override

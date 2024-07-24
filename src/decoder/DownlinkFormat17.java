@@ -35,7 +35,7 @@ public final class DownlinkFormat17 implements IDF17 {
     //
     private String callsign;
     private String vspeedSource;
-    private String acid;
+    private String icao;
     //
     private boolean singleAntenna;
     private boolean timeSync;
@@ -74,7 +74,7 @@ public final class DownlinkFormat17 implements IDF17 {
 
         pm = p;
         timestamp = time;
-        acid = "";
+        icao = "";
         callsign = "";
         altitude = -9999;
 
@@ -85,7 +85,7 @@ public final class DownlinkFormat17 implements IDF17 {
          * This is effected by interference and garbled bits, so you have to
          * validate this ACID with the ACID in hex digits 2 through 7.
          */
-        acid = raw112.substring(2, 8);
+        icao = raw112.substring(2, 8);
         crcValue = crc.crcCompute(raw112);
         valid = false;
 
@@ -198,7 +198,7 @@ public final class DownlinkFormat17 implements IDF17 {
                 lat17 = (int) (((data56 & 0x03FFFE0000L) >>> 17) & 0x01FFFFL);
                 lon17 = (int) (data56 & 0x01FFFFL);
                
-                pm.addNewPosition(acid, lat17, lon17, timestamp, cpr1, true, false); // Surface Position
+                pm.addNewPosition(icao, lat17, lon17, timestamp, cpr1, true, false); // Surface Position
                 break;
             case 9:
             case 10:
@@ -228,7 +228,7 @@ public final class DownlinkFormat17 implements IDF17 {
                 lat17 = (int) (((data56 & 0x03FFFE0000L) >>> 17) & 0x01FFFFL);
                 lon17 = (int) (data56 & 0x01FFFFL);
 
-                pm.addNewPosition(acid, lat17, lon17, timestamp, cpr1, false, false);    // Airborne position
+                pm.addNewPosition(icao, lat17, lon17, timestamp, cpr1, false, false);    // Airborne position
                 break;
             case 19:
                 // Airborne Velocity
@@ -426,8 +426,8 @@ public final class DownlinkFormat17 implements IDF17 {
         return magneticHeading;
     }
 
-    public String getACID() {
-        return acid;
+    public String getICAO() {
+        return icao;
     }
 
     @Override

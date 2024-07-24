@@ -17,7 +17,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Locale;
+import java.util.Properties;
 
 public final class ModeSDecoder {
 
@@ -33,6 +37,8 @@ public final class ModeSDecoder {
     private static PipedInputStream beast_input;
     private static InputStream comm_input;
     private static SerialPort port;
+    //
+    private static Connection db;
 
     public static void main(String[] args) {
         /*
@@ -102,6 +108,29 @@ public final class ModeSDecoder {
         }
 
         /*
+         * Open the database
+         */
+        String connectionURL = config.getDatabaseURL();
+
+        Properties properties = new Properties();
+        properties.setProperty("user", config.getDatabaseLogin());
+        properties.setProperty("password", config.getDatabasePassword());
+        properties.setProperty("useSSL", "false");
+        properties.setProperty("allowPublicKeyRetrieval", "true");
+        properties.setProperty("serverTimezone", "UTC");
+
+        /*
+         * You need the ODBC MySQL driver library in the same directory you have
+         * the executable JAR file of this program, but under a lib directory.
+         */
+        try {
+            db = DriverManager.getConnection(connectionURL, properties);
+        } catch (SQLException e2) {
+            System.err.println("ModeSDecoder Fatal: Unable to open database 1 " + connectionURL + " " + e2.getLocalizedMessage());
+            System.exit(0);
+        }
+
+        /*
          * The receiver location should be high resolution (6 digits).
          * It is used by the position determining algorithms.
          */
@@ -109,7 +138,7 @@ public final class ModeSDecoder {
 
         recv = new SerialPipe(comm_input, beast_output);   // grab Beast data and buffer between threads
         bufferData = new BufferDataBlocks(beast_input, config);     // thread to queue beast data into blocks
-        parser = new DataBlockParser(config, receiverLatLon, bufferData);  // thread to create List of targets from blocks
+        parser = new DataBlockParser(config, receiverLatLon, bufferData, db);  // thread to create List of targets from blocks
 
         Shutdown sh = new Shutdown(port, comm_input, recv, bufferData, parser);
         Runtime.getRuntime().addShutdownHook(sh);

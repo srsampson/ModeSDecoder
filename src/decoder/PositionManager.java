@@ -65,29 +65,29 @@ public final class PositionManager implements IConstants {
         return pos.size();
     }
 
-    public synchronized boolean hasPosition(String acid) {
+    public synchronized boolean hasPosition(String icao) {
         try {
-            return pos.containsKey(acid);
+            return pos.containsKey(icao);
         } catch (NullPointerException e) {
             System.err.println("PositionManager::hasPosition Exception during containsKey " + e.toString());
             return false;
         }
     }
 
-    public synchronized void addPosition(String acid, Position position) {
+    public synchronized void addPosition(String icao, Position position) {
         try {
-            pos.put(acid, position);
+            pos.put(icao, position);
         } catch (NullPointerException e) {
             System.err.println("PositionManager::addPosition Exception during put " + e.toString());
         }
     }
 
-    private synchronized Position removePosition(String acid) {
+    private synchronized Position removePosition(String icao) {
         Position position = (Position) null;
 
-        if (pos.containsKey(acid) == true) {
+        if (pos.containsKey(icao) == true) {
             try {
-                position = pos.remove(acid);
+                position = pos.remove(icao);
             } catch (NullPointerException e) {
                 System.err.println("PositionManager::removePosition Exception during remove " + e.toString());
             }
@@ -99,7 +99,7 @@ public final class PositionManager implements IConstants {
     /**
      * Store the lat/lon position on the table keyed by the Aircraft ID
      * 
-     * @param acid the aircraft ID
+     * @param icao the ICAO ID
      * @param lat17 the 17-bit latitude
      * @param lon17 the 17-bit longitude
      * @param zulu the time in UTC
@@ -107,7 +107,7 @@ public final class PositionManager implements IConstants {
      * @param surface the on the surface boolean
      * @param tis the Traffic Information Service boolean
      */
-    public void addNewPosition(String acid, int lat17, int lon17, long zulu,
+    public void addNewPosition(String icao, int lat17, int lon17, long zulu,
             boolean cpr1, boolean surface, boolean tis) {
         Position oldpos;
         LatLon latlon;
@@ -122,12 +122,12 @@ public final class PositionManager implements IConstants {
             /*
              * See if this target is on the table
              */
-            if (hasPosition(acid) == true) {
+            if (hasPosition(icao) == true) {
 
                 /*
                  * Yes, it is on the table
                  */
-                oldpos = removePosition(acid);      // might become null if it gets deleted in dropPosition
+                oldpos = removePosition(icao);      // might become null if it gets deleted in dropPosition
 
                 if (oldpos != (Position) null) {    // Timer Thread goo
 
@@ -189,10 +189,10 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
-                            if (df.hasTarget(acid)) {
-                                df.updateTargetLatLon(acid, latlon, mode, zulu);
+                            if (df.hasTarget(icao)) {
+                                df.updateTargetLatLon(icao, latlon, mode, zulu);
                             } else {
-                                df.createTargetLatLon(acid, tis, latlon, mode, zulu);
+                                df.createTargetLatLon(icao, tis, latlon, mode, zulu);
                             }
                         }
                     } else if (time == 0L) {
@@ -223,10 +223,10 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
-                            if (df.hasTarget(acid)) {
-                                df.updateTargetLatLon(acid, latlon, mode, zulu);
+                            if (df.hasTarget(icao)) {
+                                df.updateTargetLatLon(icao, latlon, mode, zulu);
                             } else {
-                                df.createTargetLatLon(acid, tis, latlon, mode, zulu);
+                                df.createTargetLatLon(icao, tis, latlon, mode, zulu);
                             }
                         }
                     }
@@ -234,14 +234,14 @@ public final class PositionManager implements IConstants {
                     /*
                      * Replace the position with modified values to table
                      */
-                    addPosition(acid, oldpos);
+                    addPosition(icao, oldpos);
                 }
             } else {
                 /*
                  * Target wasn't on the table so create a new object
                  */
 
-                addPosition(acid, new Position(acid, zulu, lat17, lon17, cpr1));
+                addPosition(icao, new Position(icao, zulu, lat17, lon17, cpr1));
             }
         }
     }
@@ -265,9 +265,9 @@ public final class PositionManager implements IConstants {
 
                 if (pos.getUpdateTime() <= pos_timeout) {
                     pos.setTimedOut(true);                      // mark timed out after XX sec
-                    addPosition(pos.getACID(), pos);            // update table value
+                    addPosition(pos.getICAO(), pos);            // update table value
                 } else if (pos.getUpdateTime() < timeout) {     // delete after a minute
-                    removePosition(pos.getACID());              // remove from table
+                    removePosition(pos.getICAO());              // remove from table
                 }
             }
         }
