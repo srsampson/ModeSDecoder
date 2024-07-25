@@ -76,13 +76,18 @@ public final class BufferDataBlocks extends Thread {
     private synchronized void pushData(int signal, String data) {
         DataBlock block;
         
-        if (data.length() < 28) {
-            messageDigest.update(data.getBytes());  // 20 byte 40 hex hash
-            String dataHash = bytesToHex(messageDigest.digest());
-
-            block = new DataBlock(DataBlock.SHORTBLOCK, zulu.getUTCTime(), signal, data, dataHash);
-        } else {
-            block = new DataBlock(DataBlock.LONGBLOCK, zulu.getUTCTime(), signal, data);
+        switch (data.length()) {
+            case 14 -> {
+                messageDigest.update(data.getBytes());  // 20 byte 40 hex hash
+                String dataHash = bytesToHex(messageDigest.digest());
+                block = new DataBlock(DataBlock.SHORTBLOCK, zulu.getUTCTime(), signal, data, dataHash);
+            }
+            case 28 -> {
+                block = new DataBlock(DataBlock.LONGBLOCK, zulu.getUTCTime(), signal, data);
+            }
+            default -> {
+                return;
+            }
         }
         
         if (recordQueue.add(block) != true) {

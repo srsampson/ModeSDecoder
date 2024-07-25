@@ -141,7 +141,7 @@ public final class ModeSDecoder {
         try {
             bufferData = new BufferDataBlocks(beast_input, config);     // queue thread
         } catch (NoSuchAlgorithmException md) {
-            System.err.println("ModeSDecoder Fatal: Unable to use SHA-256 hash " + md.getMessage());
+            System.err.println("ModeSDecoder Fatal: Unable to use SHA-1 hash " + md.getMessage());
             System.exit(0);
         }
         
