@@ -158,11 +158,10 @@ public class PressureAltitude {
                 pressureAltitude = (airportElevation + altitudeCorrection);
                 airportDataValid = true;
 
-//Used for debugging
-//                System.out.println("Pressure Altitude Correction "
-//                        + altitudeCorrection
-//                        + " As of "
-//                        + observationUTCTime);
+                System.out.println("Pressure Altitude Correction "
+                        + altitudeCorrection
+                        + " As of "
+                        + observationUTCTime);
             } else {
                 airportDataValid = false;
             }

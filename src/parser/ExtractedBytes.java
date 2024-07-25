@@ -5,38 +5,19 @@ package parser;
 
 public final class ExtractedBytes {
 
-    private byte[] messageBytes;
-    private byte[] mlatBytes;
-    private int signalLevel;
+    private final byte[] messageBytes;
+    private final int signalLevel;
 
-    public ExtractedBytes() {
-        signalLevel = -1;
-    }
-
-    public ExtractedBytes setMessageBytes(byte[] bytes) {
-        messageBytes = bytes;
-        return this;
-    }
-
-    public ExtractedBytes setMlatBytes(byte[] bytes) {
-        mlatBytes = bytes;
-        return this;
-    }
-
-    public ExtractedBytes setSignalLevel(int sl) {
+    public ExtractedBytes(int sl, byte[] mb) {
+        messageBytes = mb;
         signalLevel = sl;
-        return this;
-    }
-
-    public int getSignalLevel() {
-        return signalLevel;
-    }
-
-    public byte[] getMlatBytes() {
-        return mlatBytes;
     }
 
     public byte[] getMessageBytes() {
         return messageBytes;
+    }
+
+    public int getSignalLevel() {
+        return signalLevel;
     }
 }

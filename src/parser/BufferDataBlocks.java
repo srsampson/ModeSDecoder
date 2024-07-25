@@ -5,6 +5,8 @@ package parser;
 
 import java.io.IOException;
 import java.io.PipedInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -20,13 +22,14 @@ public final class BufferDataBlocks extends Thread {
     private final ArrayList<DataBlock> recordQueue;
     private final ZuluMillis zulu;
     private final BeastMessageParser bmp;
+    private final MessageDigest messageDigest;
     private final char[] hexArray;
     private final int amplitude;
     private boolean EOF;
     //
     private final Config config;
 
-    public BufferDataBlocks(PipedInputStream p, Config cf) {
+    public BufferDataBlocks(PipedInputStream p, Config cf) throws NoSuchAlgorithmException {
         hexArray = "0123456789ABCDEF".toCharArray();
         zulu = new ZuluMillis();
         bmp = new BeastMessageParser();
@@ -35,7 +38,8 @@ public final class BufferDataBlocks extends Thread {
         amplitude = config.getAmplitude();
         data_pipe = p;
         recordQueue = new ArrayList<>();
-
+        messageDigest = MessageDigest.getInstance("SHA-1");
+        
         process = new Thread(this);
         process.setName("BufferDataBlocks");
         process.setPriority(Thread.NORM_PRIORITY);
@@ -51,7 +55,7 @@ public final class BufferDataBlocks extends Thread {
      * Method to functionally shutdown the program by setting EOF to true
      */
     public void close() {
-        resetQueue();
+        recordQueue.clear();
         EOF = true;
     }
 
@@ -65,25 +69,23 @@ public final class BufferDataBlocks extends Thread {
     }
 
     /*
-     * Method to clear the queue and start over
-     */
-    public synchronized void resetQueue() {
-        try {
-            recordQueue.clear();
-        } catch (Exception e) {
-        }
-    }
-
-    /*
      * Push the receive packet onto the queue
+     *
+     * There is a lot of duplicate data packets from targets.
      */
-    private synchronized void pushData(int signal, String mlat, String data) {
-        DataBlock obj = new DataBlock(zulu.getUTCTime(), signal, mlat, data);
-        boolean val;
+    private synchronized void pushData(int signal, String data) {
+        DataBlock block;
+        
+        if (data.length() < 28) {
+            messageDigest.update(data.getBytes());  // 20 byte 40 hex hash
+            String dataHash = bytesToHex(messageDigest.digest());
 
-        val = recordQueue.add(obj);
-
-        if (val != true) {
+            block = new DataBlock(DataBlock.SHORTBLOCK, zulu.getUTCTime(), signal, data, dataHash);
+        } else {
+            block = new DataBlock(DataBlock.LONGBLOCK, zulu.getUTCTime(), signal, data);
+        }
+        
+        if (recordQueue.add(block) != true) {
             System.out.println("BufferDataBlocks::pushData could not add DataBlock to queue");
         }
     }
@@ -91,7 +93,7 @@ public final class BufferDataBlocks extends Thread {
     /*
      * Pop a packet off the queue
      */
-    public synchronized DataBlock popData() {
+    public synchronized DataBlock popData() throws IndexOutOfBoundsException {
         return recordQueue.remove(0);
     }
 
@@ -139,7 +141,6 @@ public final class BufferDataBlocks extends Thread {
                     while (iterator.hasNext()) {
                         packet = iterator.next();
 
-                        String mlat = bytesToHex(packet.getMlatBytes());
                         int signal = packet.getSignalLevel();
                         String data = bytesToHex(packet.getMessageBytes());
 
@@ -148,7 +149,7 @@ public final class BufferDataBlocks extends Thread {
                         // Disregard low amplitude signals
 
                         if ((signal > amplitude) && (data.length() > 4)) {
-                            pushData(signal, mlat, data);
+                            pushData(signal, data);
                         }
                     }
                 }

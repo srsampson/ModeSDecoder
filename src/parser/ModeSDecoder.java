@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -55,8 +56,7 @@ public final class ModeSDecoder {
 
         config = new Config(configFile);
 
-//TODO OFF for debugging
-//PressureAltitude pa = new PressureAltitude(config);   // Start PA data source
+        PressureAltitude pa = new PressureAltitude(config);   // Start PA data source
 
         /*
          * Create a pipe between Serial and ProcessData threads
@@ -137,7 +137,14 @@ public final class ModeSDecoder {
         receiverLatLon = new LatLon(config.getStationLatitude(), config.getStationLongitude());
 
         recv = new SerialPipe(comm_input, beast_output);   // grab Beast data and buffer between threads
-        bufferData = new BufferDataBlocks(beast_input, config);     // thread to queue beast data into blocks
+        
+        try {
+            bufferData = new BufferDataBlocks(beast_input, config);     // queue thread
+        } catch (NoSuchAlgorithmException md) {
+            System.err.println("ModeSDecoder Fatal: Unable to use SHA-256 hash " + md.getMessage());
+            System.exit(0);
+        }
+        
         parser = new DataBlockParser(config, receiverLatLon, bufferData, db);  // thread to create List of targets from blocks
 
         Shutdown sh = new Shutdown(port, comm_input, recv, bufferData, parser);

@@ -9,7 +9,6 @@ import java.util.LinkedList;
 
 /*
  * This is used to parse the Mode-S Beast binary data.
- *
  * There are only three frame formats in the binary protocol:
  *
  * <esc> "1" : 6 byte MLAT counter, 1 byte signal level, 2 byte Mode-AC
@@ -19,6 +18,8 @@ import java.util.LinkedList;
  * (<esc><esc>: true 0x1A
  *
  * <esc> is 0x1A, and "1", "2" and "3" are 0x31, 0x32 and 0x33 ASCII
+ *
+ * Ignore the MLAT counter, as we have no useful code for that.
  */
 public final class BeastMessageParser {
 
@@ -41,7 +42,6 @@ public final class BeastMessageParser {
             startOfPacket = sp;
             endOfPacket = ep;
             dataLength = dl;
-
         }
     }
 
@@ -49,7 +49,6 @@ public final class BeastMessageParser {
     private int readBufferLength;
     //
     private byte[] payload;
-    private byte[] mlatBytes;
     //
     private boolean sawFirstPacket;
 
@@ -111,10 +110,7 @@ public final class BeastMessageParser {
             sawFirstPacket = true;
             firstByteAfterLastValidPacket = endOfPacket;
 
-            ExtractedBytes extractedBytes = new ExtractedBytes()
-                .setMlatBytes(Arrays.copyOf(mlatBytes, 6))
-                .setSignalLevel(eresult.signalLevel)
-                .setMessageBytes(Arrays.copyOf(payload, dataLength));
+            ExtractedBytes extractedBytes = new ExtractedBytes(eresult.signalLevel, Arrays.copyOf(payload, dataLength));
             result.add(extractedBytes);
 
             startOfPacket = findStartIndex(firstByteAfterLastValidPacket);
@@ -181,14 +177,12 @@ public final class BeastMessageParser {
             payload = new byte[dataLength];
         }
         
-        mlatBytes = new byte[6];
-        
         int si = startOfPacket;
         int signalLevel = 0;
         int di;
 
         /*
-         * First we read the MLAT and amplitude bytes
+         * First we read the amplitude byte and ignore mlat bytes
          */
         for (di = 0; si < readBufferLength && di < 7; ++si, ++di) {
             byte ch = readBuffer[si];
@@ -199,8 +193,6 @@ public final class BeastMessageParser {
 
             if (di == 6) {
                 signalLevel = ch & 0xFF;
-            } else {
-                mlatBytes[di] = ch; // bytes 0 - 6
             }
         }
 
