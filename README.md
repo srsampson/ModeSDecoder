@@ -9,6 +9,8 @@ The database is designed so that as new targets are detected, their Mode-S ICAO 
 The US registration (N-Number) are also added when the ICAO number is decoded. These are assigned 1:1 in the US. No other countries are decoded.
 
 #### Running the Application
+You must have MySQL installed. Currently version 9.0 is used for development. Import the ```.sql``` file to create the database, tables, and triggers.
+
 You will need OpenJDK 64-bit Java version 22 or newer. Create a directory for the application, and move the ```lib``` and ```.jar``` file into it. Also copy the ```.conf``` file and edit it. Start the program on the command-line using:
 ```
 java -jdk ModeSDecoder.jar
