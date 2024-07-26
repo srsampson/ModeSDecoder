@@ -26,8 +26,8 @@ public final class Altitude {
      *
      * @param raw32 a string representing the raw (8 hex) bits to decode
      * @param hasMBit a boolean representing the altitude has the metre bit
-     * which is true for DF00, DF04, and DF20, but false for DF17 and DF18, but
-     * only if the altimeter is 25 foot capable.
+     * which is true for DF00, DF04, DF16, and DF20, but false for DF17 and DF18,
+     * but only if the altimeter is 25 foot capable.
      * @return an int representing the altitude
      */
     public int decodeAltitude(String raw32, boolean hasMBit) {

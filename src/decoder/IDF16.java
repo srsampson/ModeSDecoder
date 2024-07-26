@@ -15,17 +15,9 @@ public interface IDF16 {
 
     public boolean getIsOnGround();
 
-    public int getCapability();
-
-    public boolean getCC1();
-
     public int getRI4();
 
-    public boolean getCrosslinkCapable();
-
-    public int getBDS();
-
-    public long getData56();
+    public long getMV();
 
     /**
      * Getter to return altitude in feet
