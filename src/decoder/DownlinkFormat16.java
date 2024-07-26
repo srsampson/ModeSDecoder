@@ -35,7 +35,6 @@ public final class DownlinkFormat16 implements IDF16 {
         crc = new CRC();
         alt = new Altitude();
         dataBytes = new int[7];
-        icao = "";
         altitude = -9999;
         timestamp = time;
 

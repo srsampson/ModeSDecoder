@@ -1361,7 +1361,7 @@ public final class DataBlockParser extends Thread {
                     icao_number = df16.getICAO();
 
                     try {
-                        if (hasTarget(icao_number)) {
+                        if (hasTarget(icao_number)) {   // Note: if ICAO is "BAD" it will fail
                             isOnGround = df16.getIsOnGround();
                             altitude = df16.getAltitude();
 
@@ -1415,7 +1415,7 @@ public final class DataBlockParser extends Thread {
                             }
                         } catch (NullPointerException np) {
                             /*
-                                 * Not likely to occur
+                             * Not likely to occur
                              */
                             System.err.println(np);
                             break;
@@ -1526,7 +1526,7 @@ public final class DataBlockParser extends Thread {
                         try {
                             if (hasTarget(icao_number) == false) {
                                 /*
-                                     * New Target
+                                 * New Target
                                  */
                                 Track t = new Track(icao_number, true);  // true == TIS
 
@@ -1535,7 +1535,7 @@ public final class DataBlockParser extends Thread {
                             }
                         } catch (NullPointerException np) {
                             /*
-                                 * Not likely to occur
+                             * Not likely to occur
                              */
                             System.err.println(np);
                         }
