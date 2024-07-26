@@ -1,16 +1,21 @@
 #### ModeSDecoder - A Mode-S and ADS-B Decoder in Java
 
-This was written for the Mode-S Beast Receiver. This is a great little reciever that is based on an FPGA. It would be difficult to adapt it to another receiver, as these things all have different binary protocols to snag the data off of them.
+This application written for the Mode-S Beast Receiver. This is a great little reciever that is based on an FPGA. It would be difficult to adapt it to another receiver, as these things all have different binary protocols to snag the data off of them.
 
-The program drinks-in the serial port data (ignores the Mode-AC if enabled) and creates data structures in order to decode the bits into values we can all understand, and use for a Database Application. If you have two Mode-S Beasts, you can have two antennas pointing in different directions. Then you can run two of these Applications with different config files. Make the second ```radar_site``` a different number.
+The program processes the serial port data (ignores the Mode-AC if enabled) and creates data structures in order to decode the data. This decoded information is placed in a MySQL database. Multiple receivers can be used, each running this application and using a separate ```radar_site``` identification in the configuration file.
 
-In the TrackView Application, targets with more than one data source have a filled diamond symbol, rather than an open symbol.
+The database is designed so that as new targets are detected, their Mode-S ICAO number is added to the ```icao_table```, and the decoded information saved in the ```target_table``` and ```target_echo``` table. Sooner or later this target will land or fade-out, and the database will move it to the ```target_history``` table. If it pops-up again, then it is issued a new flight number. Thus, the ```target_table``` data is the current airborne data.
 
-This is a hobby program I've played around with to store Mode-S and ADS-B data in a MySQL database, to see what is what flying around the city.
+The US registration (N-Number) are also added when the ICAO number is decoded. These are assigned 1:1 in the US. No other countries are decoded.
 
-The database is designed so that as new targets come in, their Mode-S ICAO number is added to the ```icao_table```, and the positions saved in the ```target_table``` and ```target_echo``` table. Sooner or later this aircraft will land or fade-out, and the database will move it to the ```target_history``` table. If it pops up again, then it is issued a new flight number. The data in the ```target_table``` is the current airborne data.
+#### Duplicate Receiver Data
+The Mode-S data received has a lot of redundancy in it. Each target may transmit identical information to several radar sites. You will often see three or four transmissions with the same exact data. This application divides the Mode-S into two queues, one for short blocks and one for long. Since the long blocks are used to calculate position, this data is not filtered. On the other hand, the short block duplicates are dropped. This greatly reduces the work of decoding the information, and storing it in the database.
 
-Only updates to the US registration (N-Number) are added, as they are assigned 1:1. I don't have any info on other countries, and don't do an Internet lookup, as most sites don't allow it for free.
+#### TCAS Receiver Data
+The DF16 download format has some interesting TCAS data transmitted, and this is stored in the ```tcas_alert``` database table. It is normally deleted after a few minutes, but right now the delete timer is disabled, so I can examine the data, and delete it manually.
+
+#### METAR Internet Data
+Airborne targets transmit their altitude based on a standard 29.92 Hg pressure. This altitude may be higher or lower based on the current airport altimeter. The application connects with a NOAA weather site, and the airport selected in your config file is used to collect the current altimeter. This value is then used to provide a correction based on the Pressure altitude. This data is currently just printed, but the plans are to add it to the ```target_table``` so database users can add the calculated difference as needed.
 
 **Development Environment:**
 
