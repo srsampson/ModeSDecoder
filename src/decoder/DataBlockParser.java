@@ -1369,7 +1369,7 @@ public final class DataBlockParser extends Thread {
                             updateTargetAltitudeDF16(icao_number, altitude, detectTime);
                             updateTargetOnGround(icao_number, isOnGround, detectTime);
 
-                            if (df16.getMV() == 0x30) {   // BDS 3,0
+                            if (df16.getBDS() == 0x30) {   // BDS 3,0
                                 data56 = df16.getMV();
                                 int data30 = (int) (data56 >>> 26);
                                 /*

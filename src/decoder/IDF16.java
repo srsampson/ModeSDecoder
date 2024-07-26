@@ -18,6 +18,8 @@ public interface IDF16 {
     public int getRI4();
 
     public long getMV();
+    
+    public int getBDS();
 
     /**
      * Getter to return altitude in feet

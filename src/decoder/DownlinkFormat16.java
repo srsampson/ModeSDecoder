@@ -14,11 +14,11 @@ public final class DownlinkFormat16 implements IDF16 {
     private final Altitude alt;
     private int altitude;
     private final int ri4;
+    private final int bds;
     private final long timestamp;
     private String icao;
     private final boolean isOnGround;
-    //private final boolean cc1;
-    private final long mv;
+    private final long mv56;
     private final int[] dataBytes;
 
     /**
@@ -37,7 +37,6 @@ public final class DownlinkFormat16 implements IDF16 {
         dataBytes = new int[7];
         icao = "";
         altitude = -9999;
-
         timestamp = time;
 
         // Send the first 32 bits/8 nibbles (altitude is the last 13 bits)
@@ -74,18 +73,25 @@ public final class DownlinkFormat16 implements IDF16 {
             dataBytes[loop++] = Integer.parseInt(raw112.substring(j, j + 2), 16);   // MV
         }
 
-        mv = ((long) dataBytes[0] << 48)
+        mv56 = ((long) dataBytes[0] << 48)
                 | ((long) dataBytes[1] << 40)
                 | ((long) dataBytes[2] << 32)
                 | ((long) dataBytes[3] << 24)
                 | ((long) dataBytes[4] << 16)
                 | ((long) dataBytes[5] << 8)
                 | ((long) dataBytes[6]);
+        
+        bds = dataBytes[0];
     }
 
     @Override
     public long getMV() {
-        return mv;
+        return mv56;
+    }
+
+    @Override
+    public int getBDS() {
+        return bds;
     }
 
     @Override
