@@ -1,4 +1,4 @@
-#### ModeSDecoder - A Mode-S and ADS-B Decoder in Java
+#### ModeSDecoder - A Mode-S and ADS-B MySQL Database Application in Java
 
 This application written for the Mode-S Beast Receiver. This is a great little reciever that is based on an FPGA. It would be difficult to adapt it to another receiver, as these things all have different binary protocols to snag the data off of them.
 
