@@ -8,6 +8,12 @@ The database is designed so that as new targets are detected, their Mode-S ICAO 
 
 The US registration (N-Number) are also added when the ICAO number is decoded. These are assigned 1:1 in the US. No other countries are decoded.
 
+#### Running the Application
+You will need OpenJDK 64-bit Java version 22 or newer. Create a directory for the application, and move the ```lib``` and ```.jar``` file into it. Also copy the ```.conf``` file and edit it. Start the program on the command-line using:
+```
+java -jdk ModeSDecoder.jar
+```
+
 #### Duplicate Receiver Data
 The Mode-S data received has a lot of redundancy in it. Each target may transmit identical information to several radar sites. You will often see three or four transmissions with the same exact data. This application divides the Mode-S into two queues, one for short blocks and one for long. Since the long blocks are used to calculate position, this data is not filtered. On the other hand, the short block duplicates are dropped. This greatly reduces the work of decoding the information, and storing it in the database.
 
