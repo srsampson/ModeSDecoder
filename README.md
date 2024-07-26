@@ -11,7 +11,7 @@ The US registration (N-Number) are also added when the ICAO number is decoded. T
 #### Running the Application
 You must have MySQL installed. Currently version 9.0 is used for development. Import the ```.sql``` file to create the database, tables, and triggers.
 
-You will need OpenJDK 64-bit Java version 22 or newer. Create a directory for the application, and move the ```lib``` and ```.jar``` file into it. Also copy the ```.conf``` file and edit it. Start the program on the command-line using:
+You will need OpenJDK 64-bit Java version 22 or newer. Create a directory for the application, and move the ```lib``` and ```.jar``` file into it. Also copy the ```.conf``` file and edit it. The ```lib``` directory contains two files: the serial port connector, and the database connector. The application won't run without them. Your Windows ```PATH``` setting will also need to be modified to include the Java Home directory. Start the program on the command-line using:
 ```
 java -jdk ModeSDecoder.jar
 ```
