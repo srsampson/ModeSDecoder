@@ -97,8 +97,13 @@ public final class DataBlockParser extends Thread {
         radar_site = cf.getRadarSite();
         radarscan = (long) cf.getRadarScanTime() * 1000L;
         //
-        airport = pa.getAirportName();
-        elevation = pa.getAirportElevation();
+        if (pa == null) {
+            airport = "";
+            elevation = 0;
+        } else {
+            airport = pa.getAirportName();            
+            elevation = pa.getAirportElevation();
+        }
         //
         icao_number = "";
         callsign = "";
