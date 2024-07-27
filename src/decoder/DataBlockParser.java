@@ -19,18 +19,16 @@ import parser.Config;
 import parser.DataBlock;
 import parser.ZuluMillis;
 
-/**
- * A class to decode the received packets and put them into database tracks
- *
- * This is the main entry point for applications
+/*
+ * A class to decode the received data blocks
+ * and store them into database tracks.
  */
 public final class DataBlockParser extends Thread {
 
     private static final long RATE1 = 30L * 1000L;              // 30 seconds
     private static final long RATE2 = 5L * 1000L;               // 5 seconds
-    private static final long RATE3 = 10L * 60L * 1000L;        // 10 minutes
     //
-    private final ConcurrentHashMap<String, Track> targets;
+    private final ConcurrentHashMap<String, Track> tracks;
     private final ConcurrentHashMap<String, DataBlock> shortDetects;
     private final ArrayList<DataBlock> longDetects;
     //
@@ -40,6 +38,7 @@ public final class DataBlockParser extends Thread {
     private final PositionManager pm;
     private final NConverter nconverter;
     private final ZuluMillis zulu;
+    private static PressureAltitude pa;
     private DataBlock dbk;
     //
     private final Connection db;
@@ -48,7 +47,7 @@ public final class DataBlockParser extends Thread {
     private final Config config;
 
     private final int radar_site;
-    private final long targetTimeout;
+    private final long trackTimeout;
     private final long radarscan;
     //
     private static boolean EOF;
@@ -57,6 +56,7 @@ public final class DataBlockParser extends Thread {
     private String callsign;
     private String squawk;
     private String mdhash;
+    private String airport;
     //
     private boolean isOnGround;
     private boolean emergency;
@@ -78,23 +78,21 @@ public final class DataBlockParser extends Thread {
     private int altitude;
     private int radarIID;
     private int amplitude;
+    private int elevation;
     //
-    private final Timer timer0;
     private final Timer timer1;
     private final Timer timer2;
-    private final Timer timer3;
     //
-    private final TimerTask task0;
     private final TimerTask task1;
     private final TimerTask task2;
-    private final TimerTask task3;
     
-    public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd, Connection dbc) {
+    public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd, Connection dbc, PressureAltitude p) {
         zulu = new ZuluMillis();
         config = cf;
         receiverLatLon = ll;
         buf = bd;
         db = dbc;
+        pa = p;
 
         radar_site = cf.getRadarSite();
         radarscan = (long) cf.getRadarScanTime() * 1000L;
@@ -102,25 +100,23 @@ public final class DataBlockParser extends Thread {
         callsign = "";
         squawk = "";
         mdhash = "";      
+        airport = "";
+        elevation = 0;
 
-        targets = new ConcurrentHashMap<>();
+        tracks = new ConcurrentHashMap<>();
         shortDetects = new ConcurrentHashMap<>();
         longDetects = new ArrayList<>();
 
         pm = new PositionManager(receiverLatLon, this);
         nconverter = new NConverter();
 
-        targetTimeout = config.getDatabaseTargetTimeout() * 60L * 1000L;
+        trackTimeout = config.getDatabaseTrackTimeout() * 60L * 1000L;
 
-        task0 = new TargetTimeoutTask();
-        task1 = new UpdateReportsTask();
+        task1 = new UpdateActiveTracksTask();
         task2 = new UpdateTrackQualityTask();
-        task3 = new removeTCASAlertsTask();
 
-        timer0 = new Timer();
         timer1 = new Timer();
         timer2 = new Timer();
-        timer3 = new Timer();
 
         process = new Thread(this);
         process.setName("DataBlockParser");
@@ -130,14 +126,14 @@ public final class DataBlockParser extends Thread {
     @Override
     public void start() {
         process.start();
-        
+
+        airport = pa.getAirportName();
+        elevation = pa.getAirportElevation();
+
         EOF = false;
         
-        timer0.scheduleAtFixedRate(task0, 0L, RATE1); // Update targets every 30 seconds
         timer1.scheduleAtFixedRate(task1, 0L, RATE1);
         timer2.scheduleAtFixedRate(task2, 10L, RATE2);
-//TODO OFF for debugging
-//      timer3.scheduleAtFixedRate(task3, 14L, RATE3);
     }
 
     public void close() {
@@ -148,180 +144,87 @@ public final class DataBlockParser extends Thread {
         } catch (NullPointerException | SQLException e) {
         }
 
-        timer0.cancel();
         timer1.cancel();
         timer2.cancel();
-        timer3.cancel();
 
         pm.close();
     }
 
-    /**
-     * TargetTimeoutThread
-     *
-     * A TimerTask class to move target to history after fade-out,
-     */
-    private class TargetTimeoutTask extends TimerTask {
-
-        private long time;
-        private long timeout;
-
-        @Override
-        public void run() {
-            String update;
-
-            time = zulu.getUTCTime();
-            timeout = time - targetTimeout;    // timeout in minutes
-
-            /*
-             * This also converts the timestamp to SQL format, as the history is
-             * probably not going to need any further computations.
-             */
-            update = String.format(
-                    "INSERT INTO target_history ("
-                    + "flight_id,"
-                    + "radar_site,"
-                    + "icao_number,"
-                    + "utcdetect,"
-                    + "utcfadeout,"
-                    + "radar_iid,"
-                    + "radar_si,"
-                    + "altitude,"
-                    + "altitudedf00,"
-                    + "altitudedf04,"
-                    + "altitudedf16,"
-                    + "altitudedf17,"
-                    + "altitudedf18,"
-                    + "altitudedf20,"
-                    + "groundSpeed,"
-                    + "groundTrack,"
-                    + "gsComputed,"
-                    + "gtComputed,"
-                    + "callsign,"
-                    + "latitude,"
-                    + "longitude,"
-                    + "verticalRate,"
-                    + "verticalTrend,"
-                    + "squawk,"
-                    + "alert,"
-                    + "emergency,"
-                    + "spi,"
-                    + "onground,"
-                    + "hijack,"
-                    + "comm_out,"
-                    + "hadAlert,"
-                    + "hadEmergency,"
-                    + "hadSPI"
-                    + ") SELECT flight_id,"
-                    + "radar_site,"
-                    + "icao_number,"
-                    + "FROM_UNIXTIME(utcdetect/1000),"
-                    + "FROM_UNIXTIME(utcupdate/1000),"
-                    + "radar_iid,"
-                    + "radar_si,"
-                    + "altitude,"
-                    + "altitudedf00,"
-                    + "altitudedf04,"
-                    + "altitudedf16,"
-                    + "altitudedf17,"
-                    + "altitudedf18,"
-                    + "altitudedf20,"
-                    + "groundSpeed,"
-                    + "groundTrack,"
-                    + "gsComputed,"
-                    + "gtComputed,"
-                    + "callsign,"
-                    + "latitude,"
-                    + "longitude,"
-                    + "verticalRate,"
-                    + "verticalTrend,"
-                    + "squawk,"
-                    + "alert,"
-                    + "emergency,"
-                    + "spi,"
-                    + "onground,"
-                    + "hijack,"
-                    + "comm_out,"
-                    + "hadAlert,"
-                    + "hadEmergency,"
-                    + "hadSPI"
-                    + " FROM target_table WHERE target_table.utcupdate <= %d",
-                    timeout);
-
-            try {
-                querytt = db.createStatement();
-                querytt.executeUpdate(update);
-                querytt.close();
-            } catch (SQLException tt1) {
-                try {
-                    querytt.close();
-                } catch (SQLException tt2) {
-                }
-                System.out.println("TargetTimeoutTask::run targethistory SQL Error: " + update + " " + tt1.getMessage());
-            }
-
-            update = String.format("DELETE FROM target_table WHERE utcupdate <= %d", timeout);
-
-            try {
-                querytt = db.createStatement();
-                querytt.executeUpdate(update);
-                querytt.close();
-            } catch (SQLException tt3) {
-                try {
-                    querytt.close();
-                } catch (SQLException tt4) {
-                }
-                System.out.println("DataBlockParser::TargetTimeoutTask delete SQL Error: " + update + " " + tt3.getMessage());
-            }
+    public boolean hasTrack(String icao) throws NullPointerException {
+        synchronized (tracks) {
+            return tracks.containsKey(icao);
         }
     }
 
-    public boolean hasTarget(String icao) throws NullPointerException {
-        synchronized (targets) {
-            return targets.containsKey(icao);
-        }
-    }
-
-    public Track getTarget(String icao) throws NullPointerException {
-        synchronized (targets) {
-            return targets.get(icao);
+    public Track getTrack(String icao) throws NullPointerException {
+        synchronized (tracks) {
+            return tracks.get(icao);
         }
     }
 
     /**
-     * Method to return a collection of all targets.
+     * Method to return a collection of all tracks.
      *
-     * @return a vector Representing all target objects.
+     * @return a list Representing all track objects.
      */
-    public List<Track> getAllTargets() throws NullPointerException {
+    public List<Track> getAllTracks() throws NullPointerException {
         List<Track> result = new ArrayList<>();
 
-        synchronized (targets) {
-            result.addAll(targets.values());
+        synchronized (tracks) {
+            result.addAll(tracks.values());
         }
         
         return result;
     }
 
     /**
-     * Method to return a collection of all updated targets.
+     * Method to return a collection of all active tracks.
+     * (tracks still receiving updates, and not landed or faded).
      *
-     * @return a vector representing all the targets that have been updated
+     * @return a list representing all the tracks that are active
      */
-    public List<Track> getAllUpdatedTargets() throws NullPointerException {
+    public List<Track> getAllActiveTracks() throws NullPointerException {
         List<Track> result = new ArrayList<>();
-        List<Track> targetlist;
+        List<Track> tracklist;
         
         try {
-            targetlist = getAllTargets();
+            tracklist = getAllTracks();
         } catch (NullPointerException e) {
             return result;  // empty
         }
 
-        if (targetlist.isEmpty() == false) {
-            for (Track tgt : targetlist) {
-                if (tgt.getUpdated() == true) {
-                    result.add(tgt);
+        if (tracklist.isEmpty() == false) {
+            for (Track track : tracklist) {
+                if (track.getActive() == true) {
+                    result.add(track);
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Probably not used
+     * 
+     * Method to return a collection of all active updated tracks.
+     *
+     * @return a list representing all the tracks that have been updated
+     */
+    public List<Track> getAllActiveUpdatedTracks() throws NullPointerException {
+        List<Track> result = new ArrayList<>();
+        List<Track> tracklist;
+        
+        try {
+            tracklist = getAllActiveTracks();
+        } catch (NullPointerException e) {
+            return result;  // empty
+        }
+
+        if (tracklist.isEmpty() == false) {
+            for (Track track : tracklist) {
+                if (track.getUpdated() == true) {
+                    result.add(track);
                 }
             }
         }
@@ -330,36 +233,48 @@ public final class DataBlockParser extends Thread {
     }
 
     /**
-     * Put target on queue after being created or updated
+     * Put track on queue after being created or updated
      *
      * @param icao a String representing the Aircraft ID
-     * @param obj an Object representing the Target data
+     * @param obj an Object representing the track data
      */
-    public void addTarget(String icao, Track obj) throws NullPointerException {
-       synchronized (targets) {
-           targets.put(icao, obj);
+    public void addTrack(String icao, Track obj) throws NullPointerException {
+       synchronized (tracks) {
+           tracks.put(icao, obj);
        }
     }
 
-    public void removeTarget(String icao) throws NullPointerException {
-       synchronized (targets) {
-            if (targets.containsKey(icao) == true) {
-                targets.remove(icao);
+    public void markTrackActive(String icao) throws NullPointerException {
+       synchronized (tracks) {
+            if (tracks.containsKey(icao) == true) {
+                Track track = tracks.get(icao);
+                track.setActive(true);
+                addTrack(icao, track);
+            }
+       }
+    }
+    
+    public void markTrackInactive(String icao) throws NullPointerException {
+       synchronized (tracks) {
+            if (tracks.containsKey(icao) == true) {
+                Track track = tracks.get(icao);
+                track.setActive(false);
+                addTrack(icao, track);
             }
        }
     }
 
     /*
-     * Method to add a new TCAS alert for this target
+     * Method to add a new TCAS alert for this track
      * into the database table
      */
     public void insertTCASAlert(String hexid, long data56, long time) {
         /*
-         * See if this is even a valid target
+         * See if this is even a valid track
          */
-        if (hasTarget(hexid)) {
-            Track trk = getTarget(hexid);
-            int alt16 = trk.getAltitudeDF16();  // might be -9999 (null)
+        if (hasTrack(hexid)) {
+            Track track = getTrack(hexid);
+            int alt16 = track.getAltitudeDF16();  // might be -9999 (null)
 
             TCASAlert tcas = new TCASAlert(data56, time, alt16);
 
@@ -422,39 +337,16 @@ public final class DataBlockParser extends Thread {
     }
 
     /*
-     * This will look through the TCAS database every 10 minutes and delete
-     * entries that are over 30 minutes old. This is so I can view it manually.
+     * This will look through the Track table every 30 seconds and mark
+     * inactive entries that are over X minutes old.  In that case the
+     * track has probably landed or faded-out from coverage.
+     *
+     * Note: Only active tracks are affected.
      */
-    private class removeTCASAlertsTask extends TimerTask {
-        @Override
-        public void run() {
-            long time = zulu.getUTCTime() - (30L * 60L * 1000L); // subtract 30 minutes
-        
-            String update = String.format("DELETE FROM tcas_alerts WHERE utcupdate <= %d", time);
+    private class UpdateActiveTracksTask extends TimerTask {
 
-            try {
-                querytt = db.createStatement();
-                querytt.executeUpdate(update);
-                querytt.close();
-            } catch (SQLException tt3) {
-                try {
-                    querytt.close();
-                } catch (SQLException tt4) {
-                }
-                System.out.println("DataBlockParser::removeTCASAlerts delete SQL Error: " + update + " " + tt3.getMessage());
-            }
-        }
-    }
-
-    /*
-     * This will look through the Track table every 30 seconds and delete
-     * entries that are over X minutes old.  In that case the target has
-     * probably landed or faded-out from coverage.
-     */
-    private class UpdateReportsTask extends TimerTask {
-
-        private List<Track> targets;
-        private long targetTime;
+        private List<Track> tracks;
+        private long tracktime;
 
         @Override
         public void run() {
@@ -462,21 +354,21 @@ public final class DataBlockParser extends Thread {
             long delta;
 
             try {
-                targets = getAllTargets();
+                tracks = getAllActiveTracks();
             } catch (NullPointerException te) {
-                return; // No targets found
+                return; // No tracks found
             }
 
-            for (Track id : targets) {
+            for (Track track : tracks) {
                 try {
-                    targetTime = id.getUpdatedTime();
+                    tracktime = track.getUpdatedTime();
 
-                    if (targetTime != 0L) {
-                        // find the reports that haven't been updated in X minutes
-                        delta = Math.abs(currentTime - id.getUpdatedTime());
+                    if (tracktime != 0L) {
+                        // find tracks that haven't been updated in X minutes
+                        delta = Math.abs(currentTime - tracktime);
 
-                        if (delta >= targetTimeout) {
-                            removeTarget(id.getAircraftICAO());
+                        if (delta >= trackTimeout) {
+                            markTrackInactive(track.getAircraftICAO());
                         }
                     }
                 } catch (NullPointerException e2) {
@@ -487,13 +379,17 @@ public final class DataBlockParser extends Thread {
     }
 
     /*
+     * Track Position Quality
+     *
      * This will look through the Track local table and decrement track quality
      * every 30 seconds that the lat/lon position isn't updated. This timer task
      * is run every 5 seconds.
+     *
+     * Note: It doesn't run against inactive tracks.
      */
     private class UpdateTrackQualityTask extends TimerTask {
 
-        private List<Track> targets;
+        private List<Track> tracks;
         private long delta;
         private long currentTime;
 
@@ -504,23 +400,23 @@ public final class DataBlockParser extends Thread {
             String icao;
 
             try {
-                targets = getAllTargets();
+                tracks = getAllActiveTracks();
             } catch (NullPointerException te) {
-                return; // No targets found
+                return; // No tracks found
             }
 
-            for (Track id : targets) {
+            for (Track track : tracks) {
                 try {
-                    if (id.getTrackQuality() > 0) {
-                        icao = id.getAircraftICAO();
+                    if (track.getTrackQuality() > 0) {
+                        icao = track.getAircraftICAO();
 
                         // find the idStatus reports that haven't been position updated in 30 seconds
-                        delta = Math.abs(currentTime - id.getUpdatedPositionTime());
+                        delta = Math.abs(currentTime - track.getUpdatedPositionTime());
 
                         if (delta >= RATE1) {
-                            id.decrementTrackQuality();
-                            id.setUpdatedTime(currentTime);
-                            addTarget(icao, id);   // overwrite
+                            track.decrementTrackQuality();
+                            track.setUpdatedTime(currentTime);
+                            addTrack(icao, track);   // overwrite
                         }
                     }
                 } catch (NullPointerException e1) {
@@ -530,215 +426,214 @@ public final class DataBlockParser extends Thread {
         }
     }
 
-    private void updateTargetAmplitude(String hexid, int val, long time) {
+    private void updateTrackAmplitude(String hexid, int val, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAmplitude(val);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAmplitude(val);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
-    private void updateTargetMagneticHeadingIAS(String hexid, float head, float ias, int vvel, long time) {
+    private void updateTrackMagneticHeadingIAS(String hexid, float head, float ias, int vvel, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setHeading(head);
-            tgt.setIAS(ias);
-            tgt.setVerticalRate(vvel);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
-        } catch (NullPointerException np) {
-            System.err.println(np);
-        }
-    }
-
-    private void updateTargetMagneticHeadingTAS(String hexid, float head, float tas, int vvel, long time) {
-        try {
-            Track tgt = getTarget(hexid);
-            tgt.setHeading(head);
-            tgt.setTAS(tas);
-            tgt.setVerticalRate(vvel);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setHeading(head);
+            track.setIAS(ias);
+            track.setVerticalRate(vvel);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetCallsign(String hexid, String cs, long time) {
+    private void updateTrackMagneticHeadingTAS(String hexid, float head, float tas, int vvel, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setCallsign(cs);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setHeading(head);
+            track.setTAS(tas);
+            track.setVerticalRate(vvel);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetCallsign(String hexid, String cs, int category, long time) {
+    private void updateTrackCallsign(String hexid, String cs, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setCallsign(cs);
-            tgt.setCategory(category);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setCallsign(cs);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetAltitudeDF00(String hexid, int alt, long time) {
+    private void updateTrackCallsign(String hexid, String cs, int category, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAltitudeDF00(alt);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setCallsign(cs);
+            track.setCategory(category);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetAltitudeDF04(String hexid, int alt, long time) {
+    private void updateTrackAltitudeDF00(String hexid, int alt, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAltitudeDF04(alt);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAltitudeDF00(alt);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetAltitudeDF16(String hexid, int alt, long time) {
+    private void updateTrackAltitudeDF04(String hexid, int alt, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAltitudeDF16(alt);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAltitudeDF04(alt);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetAltitudeDF17(String hexid, int alt, long time) {
+    private void updateTrackAltitudeDF16(String hexid, int alt, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAltitudeDF17(alt);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAltitudeDF16(alt);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetAltitudeDF18(String hexid, int alt, long time) {
+    private void updateTrackAltitudeDF17(String hexid, int alt, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAltitudeDF18(alt);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAltitudeDF17(alt);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetAltitudeDF20(String hexid, int alt, long time) {
+    private void updateTrackAltitudeDF18(String hexid, int alt, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAltitudeDF20(alt);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAltitudeDF18(alt);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetGroundSpeedTrueHeading(String hexid, float gs, float th, int vs, long time) {
+    private void updateTrackAltitudeDF20(String hexid, int alt, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setGroundSpeed(gs);
-            tgt.setGroundTrack(th);
-            tgt.setVerticalRate(vs);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAltitudeDF20(alt);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetRadarID(String hexid, int iid, boolean si, long time) {
+    private void updateTrackGroundSpeedTrueHeading(String hexid, float gs, float th, int vs, long time) {
         try {
-            Track trk = getTarget(hexid);
+            Track track = getTrack(hexid);
+            track.setGroundSpeed(gs);
+            track.setGroundTrack(th);
+            track.setVerticalRate(vs);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
+        } catch (NullPointerException np) {
+            System.err.println(np);
+        }
+    }
+
+    private void updateTrackRadarID(String hexid, int iid, boolean si, long time) {
+        try {
+            Track trk = getTrack(hexid);
             trk.setRadarIID(iid);
             trk.setSI(si);
             trk.setUpdatedTime(time);
-            addTarget(hexid, trk);
+            addTrack(hexid, trk);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetSquawk(String hexid, String sq, long time) {
+    private void updateTrackSquawk(String hexid, String sq, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setSquawk(sq);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setSquawk(sq);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetBoolean(String hexid, boolean onground, boolean emergency, boolean alert, boolean spi, long time) {
+    private void updateTrackBoolean(String hexid, boolean onground, boolean emergency, boolean alert, boolean spi, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setAlert(alert, emergency, spi);
-            tgt.setOnGround(onground);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setAlert(alert, emergency, spi);
+            track.setOnGround(onground);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    private void updateTargetOnGround(String hexid, boolean onground, long time) {
+    private void updateTrackOnGround(String hexid, boolean onground, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setOnGround(onground);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setOnGround(onground);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    public void updateTargetLatLon(String hexid, LatLon latlon, int mode, long time) {
+    public void updateTrackLatLon(String hexid, LatLon latlon, int mode, long time) {
         try {
-            Track tgt = getTarget(hexid);
-            tgt.setPosition(latlon, mode, time);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = getTrack(hexid);
+            track.setPosition(latlon, mode, time);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
-    public void createTargetLatLon(String hexid, boolean tis, LatLon latlon, int mode, long time) {
+    public void createTrackLatLon(String hexid, boolean tis, LatLon latlon, int mode, long time) {
         try {
-            Track tgt = new Track(hexid, tis);
-
-            tgt.setPosition(latlon, mode, time);
-            tgt.setUpdatedTime(time);
-            addTarget(hexid, tgt);
+            Track track = new Track(hexid, tis);
+            track.setPosition(latlon, mode, time);
+            track.setUpdatedTime(time);
+            addTrack(hexid, track);
         } catch (NullPointerException np) {
             System.err.println(np);
         }
     }
 
     /*
-     * Target detection processing and adding to the Target library.
+     * Track detection processing and adding to the Track library.
      *
      * Decode Mode-S Short (56-Bit) and Long (112-Bit) Packets
      */
@@ -758,7 +653,7 @@ public final class DataBlockParser extends Thread {
 
             /*
              * The compression rate for duplicates is pretty large.
-             * For 3000 target reports, about 2000 are duplicates.
+             * For 3000 track reports, about 2000 are duplicates.
              */
 
             /*
@@ -793,10 +688,10 @@ public final class DataBlockParser extends Thread {
             parseLongDetects();
 
             /*
-             * We now have targets to process
+             * We now have tracks to process
              */
             try {
-                List<Track> table = getAllUpdatedTargets();
+                List<Track> table = getAllActiveTracks();
 
                 if (table.isEmpty() == false) {
                     for (Track trk : table) {
@@ -806,12 +701,12 @@ public final class DataBlockParser extends Thread {
                         icao_number = trk.getAircraftICAO();
 
                         /*
-                         * See if this ICAO exists yet in the target table, and
+                         * See if this ICAO exists yet in the track table, and
                          * has our radar ID. If it does, we can do an update, and
                          * if not we will do an insert.
                          */
                         try {
-                            queryString = String.format("SELECT count(*) AS TC FROM target_table WHERE icao_number='%s' AND radar_site=%d",
+                            queryString = String.format("SELECT count(*) AS TC FROM tracks WHERE icao_number='%s' AND radar_site=%d",
                                     icao_number, radar_site);
 
                             query = db.createStatement();
@@ -842,8 +737,8 @@ public final class DataBlockParser extends Thread {
                             ground = 0;
                         }
 
-                        if (exists > 0) {         // target exists
-                            queryString = String.format("UPDATE target_table SET utcupdate=%d,"
+                        if (exists > 0) {         // track exists
+                            queryString = String.format("UPDATE tracks SET utcupdate=%d,"
                                     + "amplitude=%d,"
                                     + "radar_iid=NULLIF(%d, -99),"
                                     + "radar_si=%d,"
@@ -873,7 +768,8 @@ public final class DataBlockParser extends Thread {
                                     + "comm_out=%d,"
                                     + "hadAlert=%d,"
                                     + "hadEmergency=%d,"
-                                    + "hadSPI=%d"
+                                    + "hadSPI=%d,"
+                                    + "active=%d"
                                     + " WHERE icao_number='%s' AND radar_site=%d",
                                     time,
                                     trk.getAmplitude(),
@@ -906,10 +802,11 @@ public final class DataBlockParser extends Thread {
                                     trk.getHadAlert() ? 1 : 0,
                                     trk.getHadEmergency() ? 1 : 0,
                                     trk.getHadSPI() ? 1 : 0,
+                                    trk.getActive() ? 1 : 0,
                                     icao_number,
                                     radar_site);
-                        } else {                // target doesn't exist
-                            queryString = String.format("INSERT INTO target_table ("
+                        } else {                // track doesn't exist
+                            queryString = String.format("INSERT INTO tracks ("
                                     + "icao_number,"
                                     + "radar_site,"
                                     + "utcdetect,"
@@ -964,7 +861,7 @@ public final class DataBlockParser extends Thread {
                                     + "%d,"
                                     + "%d,"
                                     + "'%s',"
-                                    + "%d,%d,%d,%d,%d,%d,%d,%d,%d)",
+                                    + "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
                                     icao_number,
                                     radar_site,
                                     time,
@@ -998,7 +895,8 @@ public final class DataBlockParser extends Thread {
                                     trk.getCommOut() ? 1 : 0,
                                     trk.getHadAlert() ? 1 : 0,
                                     trk.getHadEmergency() ? 1 : 0,
-                                    trk.getHadSPI() ? 1 : 0);
+                                    trk.getHadSPI() ? 1 : 0,
+                                    trk.getActive() ? 1 : 0);
                         }
 
                         try {
@@ -1007,7 +905,7 @@ public final class DataBlockParser extends Thread {
                             query.close();
                         } catch (SQLException e5) {
                             query.close();
-                            System.out.println("DataBlockParser::run insert/update target_table Error: " + queryString + " " + e5.getMessage());
+                            System.out.println("DataBlockParser::run insert/update tracks table Error: " + queryString + " " + e5.getMessage());
                         }
 
                         if (trk.getUpdatePosition() == true) {
@@ -1016,7 +914,7 @@ public final class DataBlockParser extends Thread {
                             // Safety check, we don't want NULL's
                             // TODO: Figure out why we get those
                             if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
-                                queryString = String.format("INSERT INTO target_echo ("
+                                queryString = String.format("INSERT INTO position_echo ("
                                         + "flight_id,"
                                         + "radar_site,"
                                         + "icao_number,"
@@ -1030,7 +928,7 @@ public final class DataBlockParser extends Thread {
                                         + "verticalTrend,"
                                         + "onground"
                                         + ") VALUES ("
-                                        + "(SELECT flight_id FROM target_table WHERE icao_number='%s' AND radar_site=%d),"
+                                        + "(SELECT flight_id FROM tracks WHERE icao_number='%s' AND radar_site=%d),"
                                         + "%d,"
                                         + "'%s',"
                                         + "%d,"
@@ -1061,7 +959,7 @@ public final class DataBlockParser extends Thread {
                                     query.close();
                                 } catch (SQLException e6) {
                                     query.close();
-                                    System.out.println("DataBlockParser::run query target_echo Error: " + queryString + " " + e6.getMessage());
+                                    System.out.println("DataBlockParser::run query position_echo Error: " + queryString + " " + e6.getMessage());
                                 }
                             }
                         }
@@ -1069,7 +967,7 @@ public final class DataBlockParser extends Thread {
                         if (trk.getRegistration().equals("") == false) {
                             try {
 
-                                queryString = String.format("SELECT count(*) AS RG FROM icao_table"
+                                queryString = String.format("SELECT count(*) AS RG FROM icao_list"
                                         + " WHERE icao_number='%s'", icao_number);
 
                                 query = db.createStatement();
@@ -1086,12 +984,12 @@ public final class DataBlockParser extends Thread {
                             } catch (SQLException e7) {
                                 rs.close();
                                 query.close();
-                                System.out.println("DataBlockParser::run query icao_table warn: " + queryString + " " + e7.getMessage());
+                                System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e7.getMessage());
                                 continue;   // skip the following
                             }
 
                             if (exists > 0) {
-                                queryString = String.format("UPDATE icao_table SET registration='%s' WHERE icao_number='%s'",
+                                queryString = String.format("UPDATE icao_list SET registration='%s' WHERE icao_number='%s'",
                                         trk.getRegistration(),
                                         icao_number);
 
@@ -1104,7 +1002,7 @@ public final class DataBlockParser extends Thread {
                         if (trk.getCallsign().equals("") == false) {
                             try {
 
-                                queryString = String.format("SELECT count(*) AS CS FROM callsign_table"
+                                queryString = String.format("SELECT count(*) AS CS FROM callsign_list"
                                         + " WHERE callsign='%s' AND icao_number='%s' AND radar_site=%d",
                                         trk.getCallsign(), icao_number, radar_site);
 
@@ -1122,17 +1020,17 @@ public final class DataBlockParser extends Thread {
                             } catch (SQLException e8) {
                                 rs.close();
                                 query.close();
-                                System.out.println("DataBlockParser::run query callsign_table warn: " + queryString + " " + e8.getMessage());
+                                System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e8.getMessage());
                                 continue;   // skip the following
                             }
 
                             if (exists > 0) {
-                                queryString = String.format("UPDATE callsign_table SET utcupdate=%d WHERE callsign='%s' AND icao_number='%s' AND radar_site=%d",
+                                queryString = String.format("UPDATE callsign_list SET utcupdate=%d WHERE callsign='%s' AND icao_number='%s' AND radar_site=%d",
                                         time, trk.getCallsign(), icao_number, radar_site);
                             } else {
-                                queryString = String.format("INSERT INTO callsign_table (callsign,flight_id,radar_site,icao_number,"
+                                queryString = String.format("INSERT INTO callsign_list (callsign,flight_id,radar_site,icao_number,"
                                         + "utcdetect,utcupdate) VALUES ('%s',"
-                                        + "(SELECT flight_id FROM target_table WHERE icao_number='%s' AND radar_site=%d),"
+                                        + "(SELECT flight_id FROM track WHERE icao_number='%s' AND radar_site=%d),"
                                         + "%d,'%s',%d,%d)",
                                         trk.getCallsign(),
                                         icao_number,
@@ -1150,7 +1048,7 @@ public final class DataBlockParser extends Thread {
                     }
                 } // table empty
             } catch (NullPointerException | SQLException g1) {
-                // No targets updated
+                // No tracks updated
             }
 
             /*
@@ -1178,7 +1076,7 @@ public final class DataBlockParser extends Thread {
 
             /*
              * Most decoders pass a lot of garble packets, so we first check if
-             * DF11 or DF17/18 have validated the packet by calling hasTarget().
+             * DF11 or DF17/18 have validated the packet by calling hasTrack().
              * If not, then it is garbled.
              *
              * Note: The DF code itself may be garbled
@@ -1198,13 +1096,13 @@ public final class DataBlockParser extends Thread {
                     icao_number = df00.getICAO();
 
                     try {
-                        if (hasTarget(icao_number)) {           // must be valid then
+                        if (hasTrack(icao_number)) {           // must be valid then
                             altitude = df00.getAltitude();
                             isOnGround = df00.getIsOnGround();      // true if vs1 == 1
 
-                            updateTargetAmplitude(icao_number, amplitude, detectTime);
-                            updateTargetAltitudeDF00(icao_number, altitude, detectTime);
-                            updateTargetOnGround(icao_number, isOnGround, detectTime);
+                            updateTrackAmplitude(icao_number, amplitude, detectTime);
+                            updateTrackAltitudeDF00(icao_number, altitude, detectTime);
+                            updateTrackOnGround(icao_number, isOnGround, detectTime);
                         }
                     } catch (NullPointerException np) {
                         /*
@@ -1227,16 +1125,16 @@ public final class DataBlockParser extends Thread {
                     icao_number = df04.getICAO();
 
                     try {
-                        if (hasTarget(icao_number)) {
+                        if (hasTrack(icao_number)) {
                             altitude = df04.getAltitude();
                             isOnGround = df04.getIsOnGround();
                             alert = df04.getIsAlert();
                             spi = df04.getIsSPI();
                             emergency = df04.getIsEmergency();
 
-                            updateTargetAmplitude(icao_number, amplitude, detectTime);
-                            updateTargetAltitudeDF04(icao_number, altitude, detectTime);
-                            updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                            updateTrackAmplitude(icao_number, amplitude, detectTime);
+                            updateTrackAltitudeDF04(icao_number, altitude, detectTime);
+                            updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
                         }
                     } catch (NullPointerException np) {
                         /*
@@ -1259,16 +1157,16 @@ public final class DataBlockParser extends Thread {
                     icao_number = df05.getICAO();
 
                     try {
-                        if (hasTarget(icao_number)) {
+                        if (hasTrack(icao_number)) {
                             squawk = df05.getSquawk();
                             isOnGround = df05.getIsOnGround();
                             alert = df05.getIsAlert();
                             spi = df05.getIsSPI();
                             emergency = df05.getIsEmergency();
 
-                            updateTargetAmplitude(icao_number, amplitude, detectTime);
-                            updateTargetSquawk(icao_number, squawk, detectTime);
-                            updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                            updateTrackAmplitude(icao_number, amplitude, detectTime);
+                            updateTrackSquawk(icao_number, squawk, detectTime);
+                            updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
                         }
                     } catch (NullPointerException np) {
                         /*
@@ -1292,16 +1190,16 @@ public final class DataBlockParser extends Thread {
 
                     if (df11.isValid()) {
                         /*
-                         * See if Target already exists
+                         * See if Track already exists
                          */
                         try {
-                            if (hasTarget(icao_number) == false) {
+                            if (hasTrack(icao_number) == false) {
                                 /*
-                                 * New Target
+                                 * New Track
                                  */
                                 Track t = new Track(icao_number, false);  // false == not TIS
                                 t.setRegistration(nconverter.icao_to_n(icao_number));
-                                addTarget(icao_number, t);
+                                addTrack(icao_number, t);
                             }
                         } catch (NullPointerException np) {
                             /*
@@ -1311,14 +1209,14 @@ public final class DataBlockParser extends Thread {
                             break;
                         }
 
-                        updateTargetAmplitude(icao_number, amplitude, detectTime);
+                        updateTrackAmplitude(icao_number, amplitude, detectTime);
 
                         radarIID = df11.getRadarIID();
                         si = df11.getRadarSI();
-                        updateTargetRadarID(icao_number, radarIID, si, detectTime);
+                        updateTrackRadarID(icao_number, radarIID, si, detectTime);
 
                         isOnGround = df11.getIsOnGround();
-                        updateTargetOnGround(icao_number, isOnGround, detectTime);
+                        updateTrackOnGround(icao_number, isOnGround, detectTime);
                     }
                     break;
                 default:    // output CSV
@@ -1342,7 +1240,7 @@ public final class DataBlockParser extends Thread {
             /*
              * Most decoders pass a lot of garble packets, so we
              * first check if DF11 or DF17/18 have validated
-             * the packet by calling hasTarget().  If not, then
+             * the packet by calling hasTrack().  If not, then
              * it is garbled.
              *
              * Note: The DF code itself may be garbled
@@ -1362,13 +1260,13 @@ public final class DataBlockParser extends Thread {
                     icao_number = df16.getICAO();
 
                     try {
-                        if (hasTarget(icao_number)) {   // Note: if ICAO is "BAD" it will fail
+                        if (hasTrack(icao_number)) {   // Note: if ICAO is "BAD" it will fail
                             isOnGround = df16.getIsOnGround();
                             altitude = df16.getAltitude();
 
-                            updateTargetAmplitude(icao_number, amplitude, detectTime);
-                            updateTargetAltitudeDF16(icao_number, altitude, detectTime);
-                            updateTargetOnGround(icao_number, isOnGround, detectTime);
+                            updateTrackAmplitude(icao_number, amplitude, detectTime);
+                            updateTrackAltitudeDF16(icao_number, altitude, detectTime);
+                            updateTrackOnGround(icao_number, isOnGround, detectTime);
 
                             if (df16.getBDS() == 0x30) {   // BDS 3,0
                                 data56 = df16.getMV();
@@ -1403,16 +1301,16 @@ public final class DataBlockParser extends Thread {
 
                     if (df17.isValid() == true) { // CRC passed
                         /*
-                         * See if Target already exists
+                         * See if Track already exists
                          */
                         try {
-                            if (hasTarget(icao_number) == false) {
+                            if (hasTrack(icao_number) == false) {
                                 /*
-                                 * New Target
+                                 * New Track
                                  */
                                 Track t = new Track(icao_number, false);  // false == not TIS
                                 t.setRegistration(nconverter.icao_to_n(icao_number));
-                                addTarget(icao_number, t);
+                                addTrack(icao_number, t);
                             }
                         } catch (NullPointerException np) {
                             /*
@@ -1422,7 +1320,7 @@ public final class DataBlockParser extends Thread {
                             break;
                         }
 
-                        updateTargetAmplitude(icao_number, amplitude, detectTime);
+                        updateTrackAmplitude(icao_number, amplitude, detectTime);
 
                         switch (df17.getFormatType()) {
                             case 0:
@@ -1437,7 +1335,7 @@ public final class DataBlockParser extends Thread {
                                 category = df17.getCategory();
                                 callsign = df17.getCallsign();
 
-                                updateTargetCallsign(icao_number, callsign, category, detectTime);
+                                updateTrackCallsign(icao_number, callsign, category, detectTime);
                                 break;
                             case 5:
                             case 6:
@@ -1450,7 +1348,7 @@ public final class DataBlockParser extends Thread {
                                 alert = df17.getIsAlert();
                                 spi = df17.getIsSPI();
 
-                                updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
                                 break;
                             case 9:
                             case 10:
@@ -1468,10 +1366,10 @@ public final class DataBlockParser extends Thread {
                                 alert = df17.getIsAlert();
                                 spi = df17.getIsSPI();
 
-                                updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
 
                                 altitude = df17.getAltitude();
-                                updateTargetAltitudeDF17(icao_number, altitude, detectTime);
+                                updateTrackAltitudeDF17(icao_number, altitude, detectTime);
 
                                 break;
                             case 19:
@@ -1485,7 +1383,7 @@ public final class DataBlockParser extends Thread {
                                         vSpeed = df17.getVspeed();
 
                                         if (trueHeading != -1.0) {
-                                            updateTargetGroundSpeedTrueHeading(icao_number, groundSpeed, trueHeading, vSpeed, detectTime);
+                                            updateTrackGroundSpeedTrueHeading(icao_number, groundSpeed, trueHeading, vSpeed, detectTime);
                                         }
                                         break;
                                     case 3: // subsonic
@@ -1498,9 +1396,9 @@ public final class DataBlockParser extends Thread {
                                             vSpeed = df17.getVspeed();
 
                                             if (df17.getTasFlag() == false) {
-                                                updateTargetMagneticHeadingIAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                updateTrackMagneticHeadingIAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
                                             } else {
-                                                updateTargetMagneticHeadingTAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                updateTrackMagneticHeadingTAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
                                             }
                                         }
                                 }
@@ -1522,17 +1420,17 @@ public final class DataBlockParser extends Thread {
 
                     if (df18.isValid() == true) { // Passed CRC
                         /*
-                         * See if Target already exists
+                         * See if Track already exists
                          */
                         try {
-                            if (hasTarget(icao_number) == false) {
+                            if (hasTrack(icao_number) == false) {
                                 /*
-                                 * New Target
+                                 * New Track
                                  */
                                 Track t = new Track(icao_number, true);  // true == TIS
 
                                 t.setRegistration(nconverter.icao_to_n(icao_number));
-                                addTarget(icao_number, t);
+                                addTrack(icao_number, t);
                             }
                         } catch (NullPointerException np) {
                             /*
@@ -1541,7 +1439,7 @@ public final class DataBlockParser extends Thread {
                             System.err.println(np);
                         }
 
-                        updateTargetAmplitude(icao_number, amplitude, detectTime);
+                        updateTrackAmplitude(icao_number, amplitude, detectTime);
 
                         switch (df18.getFormatType()) {
                             case 0:
@@ -1556,7 +1454,7 @@ public final class DataBlockParser extends Thread {
                                 category = df18.getCategory();
                                 callsign = df18.getCallsign();
 
-                                updateTargetCallsign(icao_number, callsign, category, detectTime);
+                                updateTrackCallsign(icao_number, callsign, category, detectTime);
                                 break;
                             case 5:
                             case 6:
@@ -1569,7 +1467,7 @@ public final class DataBlockParser extends Thread {
                                 alert = df18.getIsAlert();
                                 spi = df18.getIsSPI();
 
-                                updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
                                 break;
                             case 9:
                             case 10:
@@ -1587,10 +1485,10 @@ public final class DataBlockParser extends Thread {
                                 alert = df18.getIsAlert();
                                 spi = df18.getIsSPI();
 
-                                updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                                updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
 
                                 altitude = df18.getAltitude();
-                                updateTargetAltitudeDF18(icao_number, altitude, detectTime);
+                                updateTrackAltitudeDF18(icao_number, altitude, detectTime);
                                 break;
                             case 19:
                                 subtype3 = df18.getSubType();
@@ -1603,7 +1501,7 @@ public final class DataBlockParser extends Thread {
                                         vSpeed = df18.getVspeed();
 
                                         if (!(Float.compare(trueHeading, -1.0f) == 0)) {
-                                            updateTargetGroundSpeedTrueHeading(icao_number, groundSpeed, trueHeading, vSpeed, detectTime);
+                                            updateTrackGroundSpeedTrueHeading(icao_number, groundSpeed, trueHeading, vSpeed, detectTime);
                                         }
                                         break;
                                     case 3: // subsonic
@@ -1616,9 +1514,9 @@ public final class DataBlockParser extends Thread {
                                             vSpeed = df18.getVspeed();
 
                                             if (df18.getTasFlag() == false) {
-                                                updateTargetMagneticHeadingIAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                updateTrackMagneticHeadingIAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
                                             } else {
-                                                updateTargetMagneticHeadingTAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
+                                                updateTrackMagneticHeadingTAS(icao_number, magneticHeading, airspeed, vSpeed, detectTime);
                                             }
                                         }
                                 }
@@ -1641,23 +1539,23 @@ public final class DataBlockParser extends Thread {
                     icao_number = df20.getICAO();
 
                     try {
-                        if (hasTarget(icao_number)) {
+                        if (hasTrack(icao_number)) {
                             altitude = df20.getAltitude();
                             isOnGround = df20.getIsOnGround();
                             emergency = df20.getIsEmergency();
                             alert = df20.getIsAlert();
                             spi = df20.getIsSPI();
 
-                            updateTargetAmplitude(icao_number, amplitude, detectTime);
-                            updateTargetAltitudeDF20(icao_number, altitude, detectTime);
-                            updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                            updateTrackAmplitude(icao_number, amplitude, detectTime);
+                            updateTrackAltitudeDF20(icao_number, altitude, detectTime);
+                            updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
 
                             int bds = df20.getBDS();
                             data56 = df20.getData56();
 
                             if (bds == 0x20) {             // BDS 2,0
                                 callsign = df20.getCallsign();
-                                updateTargetCallsign(icao_number, callsign, detectTime);
+                                updateTrackCallsign(icao_number, callsign, detectTime);
                             } else if (bds == 0x30) {      // BDS 3,0
                                 int data30 = (int) (data56 >>> 26);
                                 /*
@@ -1689,16 +1587,16 @@ public final class DataBlockParser extends Thread {
                     icao_number = df21.getICAO();
 
                     try {
-                        if (hasTarget(icao_number)) {
+                        if (hasTrack(icao_number)) {
                             squawk = df21.getSquawk();
                             isOnGround = df21.getIsOnGround();
                             emergency = df21.getIsEmergency();
                             alert = df21.getIsAlert();
                             spi = df21.getIsSPI();
 
-                            updateTargetAmplitude(icao_number, amplitude, detectTime);
-                            updateTargetSquawk(icao_number, squawk, detectTime);
-                            updateTargetBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
+                            updateTrackAmplitude(icao_number, amplitude, detectTime);
+                            updateTrackSquawk(icao_number, squawk, detectTime);
+                            updateTrackBoolean(icao_number, isOnGround, emergency, alert, spi, detectTime);
 
                             int bds = df21.getBDS();
                             data56 = df21.getData56();
@@ -1706,7 +1604,7 @@ public final class DataBlockParser extends Thread {
                             switch (bds) {      // Bunch more available for decode
                                 case 0x20:      // BDS 2,0 Callsign
                                     callsign = df21.getCallsign();
-                                    updateTargetCallsign(icao_number, callsign, detectTime);
+                                    updateTrackCallsign(icao_number, callsign, detectTime);
                                     break;
                                 case 0x30:      // BDS 3,0 TCAS
                                     int data30 = (int) (data56 >>> 26);

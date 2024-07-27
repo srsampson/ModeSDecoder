@@ -17,7 +17,7 @@ import parser.ZuluMillis;
 /*
  * Pressure Altitude and Altitude Correction Class
  * 
- * Used for calculating target altitude correction below transition altitude.
+ * Used for calculating track altitude correction below transition altitude.
  * The GUI can replace the altitude shown for each aircraft below the transition
  * altitude with the aircraft's sent-value minus the correction calculated here.
  */
@@ -63,6 +63,10 @@ public class PressureAltitude {
         timer1.scheduleAtFixedRate(task1, 0L, RATE);
     }
 
+    public String getAirportName() {
+        return airportName;
+    }
+
     public int getPressureAltitude() {
         if (airportDataValid == true) {
             return pressureAltitude;
@@ -85,6 +89,10 @@ public class PressureAltitude {
 
     public String getObservationTime() {
         return observationUTCTime;
+    }
+
+    public int getAirportElevation() {
+        return airportElevation;
     }
 
     public void setAirportElevation(int val) {

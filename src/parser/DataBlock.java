@@ -4,7 +4,7 @@
 package parser;
 
 /*
- * The DataBlock structure is the raw target data detected at the serial port
+ * The DataBlock structure is the raw receive data detected at the serial port
  * that are 56-bit and 112-bit Mode-S Packets.
  *
  * Short Blocks have a hash code, as they are duplicate filtered.

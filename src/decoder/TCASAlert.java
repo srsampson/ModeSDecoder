@@ -7,7 +7,7 @@ package decoder;
  * Comm-B Data Selector (BDS) field equal to 0x30
  *
  * <p>
- * The BDS register 3,0 is used by the target aircraft to send to the ground any
+ * The BDS register 3,0 is used by the track aircraft to send to the ground any
  * TCAS advisories that are threats to this aircraft.
  *
  * <p>
@@ -77,7 +77,7 @@ public final class TCASAlert {
      */
     private boolean threatTerminated;
 
-    public TCASAlert(long data56, long time, int targetAltitude) {
+    public TCASAlert(long data56, long time, int trackAltitude) {
         tti = 0;
         ara6 = 0;
         rac4 = 0;
@@ -129,7 +129,7 @@ public final class TCASAlert {
                     threatAltitude = alt.modecDecode(a3, b3, c3, d3);
              
                     if (threatAltitude != -9999) {
-                        threatRelativeAltitude = targetAltitude - threatAltitude;
+                        threatRelativeAltitude = trackAltitude - threatAltitude;
                     } else {
                         threatRelativeAltitude = -9999;
                     }
@@ -277,13 +277,13 @@ public final class TCASAlert {
     }
 
     /**
-     * Method to return whether the target has multiple threats
+     * Method to return whether the track has multiple threats
      *
      * <p>
-     * true = The target has multiple threats<br>
-     * false = The target has only one threat
+     * true = The track has multiple threats<br>
+     * false = The track has only one threat
      *
-     * @return a boolean representing the targets having more than one threat
+     * @return a boolean representing the tracks having more than one threat
      */
     public boolean getHasMultipleThreats() {
         return (activeRA && multipleRA);
@@ -354,7 +354,7 @@ public final class TCASAlert {
     }
 
     /**
-     * Method to return the range in nautical miles to a threat target
+     * Method to return the range in nautical miles to a threat track
      *
      * <p>
      * The threat range is converted to floating point (.05 minimum to 13.0
@@ -373,7 +373,7 @@ public final class TCASAlert {
     }
 
     /**
-     * Method to return the threat bearing in degrees relative to the targets
+     * Method to return the threat bearing in degrees relative to the tracks
      * nose.
      *
      * <p>
@@ -416,7 +416,7 @@ public final class TCASAlert {
      *
      * <p>
      * The threat altitude returned in the TCAS report is subtracted from the
-     * targets reporting altitude, resulting in a +/- relative difference.
+     * tracks reporting altitude, resulting in a +/- relative difference.
      *
      * <p>
      * A negative value indicates the threat is below<br>

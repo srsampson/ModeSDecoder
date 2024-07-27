@@ -12,7 +12,7 @@ import java.util.Properties;
  */
 public final class Config {
 
-    private int databaseTargetTimeout;
+    private int databaseTrackTimeout;
     private String databaseHost;
     private String databaseName;
     private String databasePort;
@@ -40,9 +40,9 @@ public final class Config {
 
         commPort = "COM4";
         airportName = "";
-        radarscan = 3;      // simulates a 20 RPM antenna, 10 would be 6 RPM
+        radarscan = 10;      // value 3 simulates 20 RPM antenna, 10 would be 6 RPM
         radar_site = 0;
-        databaseTargetTimeout = 3;    // 3 minutes
+        databaseTrackTimeout = 3;    // 3 minutes
         amplitude = 0;
         //
         latitude = 0.0f;
@@ -87,8 +87,8 @@ public final class Config {
 
             temp = Props.getProperty("radar.scan");
             if (temp == null) {
-                radarscan = 3;
-                System.out.println("radar.scan not set, set to 3 seconds");
+                radarscan = 10;
+                System.out.println("radar.scan not set, set to 10 seconds");
             } else {
                 try {
                     radarscan = Integer.parseInt(temp.trim());
@@ -99,7 +99,7 @@ public final class Config {
                         radarscan = 13;
                     }
                 } catch (NumberFormatException e4) {
-                    radarscan = 3;
+                    radarscan = 10;
                 }
             }
 
@@ -111,15 +111,15 @@ public final class Config {
                 commPort = temp.trim();
             }
 
-            temp = Props.getProperty("db.targettimeout");
+            temp = Props.getProperty("db.tracktimeout");
             if (temp == null) {
-                databaseTargetTimeout = 3;
-                System.out.println("db.targettimeout not set, set to 3 minutes");
+                databaseTrackTimeout = 3;
+                System.out.println("db.tracktimeout not set, set to 3 minutes");
             } else {
                 try {
-                    databaseTargetTimeout = Integer.parseInt(temp.trim());
+                    databaseTrackTimeout = Integer.parseInt(temp.trim());
                 } catch (NumberFormatException e6) {
-                    databaseTargetTimeout = 3;
+                    databaseTrackTimeout = 3;
                 }
             }
 
@@ -213,8 +213,8 @@ public final class Config {
 
             temp = Props.getProperty("station.airport");
             if (temp == null) {
-                airportName = "KOKC";
-                System.out.println("station.airport not set, set to KOKC");
+                airportName = "";
+                System.out.println("station.airport not set, set to Empty");
             } else {
                 airportName = temp.trim();
             }
@@ -267,12 +267,12 @@ public final class Config {
     }
 
     /**
-     * Getter to return the target timeout value
+     * Getter to return the track timeout value
      *
      * @return an int Representing the database timeout for archiving
      */
-    public int getDatabaseTargetTimeout() {
-        return databaseTargetTimeout;
+    public int getDatabaseTrackTimeout() {
+        return databaseTrackTimeout;
     }
 
     public int getAmplitude() {

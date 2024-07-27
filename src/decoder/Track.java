@@ -57,16 +57,17 @@ public final class Track implements IConstants {
     private boolean hadSPI;
     private boolean updated;        // set on update, cleared on sent
     private boolean updatePosition;
-    private boolean isLocal;            // Target is from one of our radars/not remote
-    private boolean isRelayed;          // Target has been relayed by a ground site (TIS-B)
+    private boolean isLocal;            // Track is from one of our radars/not remote
+    private boolean isRelayed;          // Track has been relayed by a ground site (TIS-B)
+    private boolean active;         // track receiving updates
 
     /**
      * A track is the complete data structure of the ICAO ID (icao).
-     * It takes several different target reports to gather all the data,
+     * It takes several different track reports to gather all the data,
      * but this is where it is finally stored.
      *
      * @param ac a String representing the ICAO ID of the vehicle
-     * @param relayed a boolean representing a target that is relayed (TIS-B)
+     * @param relayed a boolean representing a track that is relayed (TIS-B)
      */
     public Track(String ac, boolean relayed) {
         isLocal = true;
@@ -106,6 +107,7 @@ public final class Track implements IConstants {
                 = hadEmergency = hadSPI = si = hijack = comm_out = false;
         updated = updatePosition = false;
         isOnGround = isVirtOnGround = false;
+        active = false;
     }
 
     /**
@@ -147,6 +149,26 @@ public final class Track implements IConstants {
      */
     public int getTrackQuality() {
         return trackQuality;
+    }
+    
+    /**
+     * Method to set the track active
+     * (receiving updates, not landed or faded).
+     *
+     * @param val a boolean which signals the track is active
+     */
+    public void setActive(boolean val) {
+        active = val;
+    }
+
+    /**
+     * Method to check if the track is still active
+     * (receiving updates, not landed or faded).
+     *
+     * @return boolean which signals if the track is still active
+     */
+    public boolean getActive() {
+        return active;
     }
 
     /**
@@ -339,18 +361,18 @@ public final class Track implements IConstants {
     }
     
     /**
-     * Method used to return the target ground speed in knots
+     * Method used to return the track ground speed in knots
      *
-     * @return target groundspeed in knots
+     * @return track groundspeed in knots
      */
     public float getGroundSpeed() {
         return groundSpeed;
     }
 
     /**
-     * Method used to return the target ground track in degrees true north.
+     * Method used to return the track ground track in degrees true north.
      *
-     * @return target ground track in degrees true north
+     * @return track ground track in degrees true north
      */
     public float getGroundTrack() {
         return groundTrack;
@@ -364,19 +386,19 @@ public final class Track implements IConstants {
     }
 
     /**
-     * Method used to return the target computed ground speed in knots
+     * Method used to return the track computed ground speed in knots
      *
-     * @return target groundspeed in knots
+     * @return track groundspeed in knots
      */
     public float getComputedGroundSpeed() {
         return groundSpeedComputed;
     }
 
     /**
-     * Method used to return the target computed ground track in degrees true
+     * Method used to return the track computed ground track in degrees true
      * north.
      *
-     * @return target ground track in degrees true north
+     * @return track ground track in degrees true north
      */
     public float getComputedGroundTrack() {
         return groundTrackComputed;
@@ -534,9 +556,9 @@ public final class Track implements IConstants {
     }
     
     /**
-     * Method used to return the target altitude in feet MSL (29.92)
+     * Method used to return the track altitude in feet MSL (29.92)
      *
-     * @return an integer Representing the target altitude in feet MSL
+     * @return an integer Representing the track altitude in feet MSL
      */
     public int getAltitude() {
 
@@ -577,29 +599,29 @@ public final class Track implements IConstants {
     }
     
     /**
-     * Method used to return the target latitude in degrees (south is negative)
+     * Method used to return the track latitude in degrees (south is negative)
      *
-     * @return a float Representing the target latitude
+     * @return a float Representing the track latitude
      */
     public float getLatitude() {
         return latitude;
     }
 
     /**
-     * Method used to return the target longitude in degrees (west is negative)
+     * Method used to return the track longitude in degrees (west is negative)
      *
-     * @return a float Representing the target longitude
+     * @return a float Representing the track longitude
      */
     public float getLongitude() {
         return longitude;
     }
 
     /**
-     * Method used to set the target 2D position (latitude, longitude) (south
+     * Method used to set the track 2D position (latitude, longitude) (south
      * and west are negative)
      *
-     * @param latlon an object Representing the target lat/lon
-     * @param mode an int Representing the target mode
+     * @param latlon an object Representing the track lat/lon
+     * @param mode an int Representing the track mode
      * @param utc a long timestamp
      */
     public void setPosition(LatLon latlon, int mode, long utc) {
@@ -627,19 +649,19 @@ public final class Track implements IConstants {
     }
 
     /**
-     * Method used to return the target callsign
+     * Method used to return the track callsign
      *
-     * @return a string Representing the target callsign
+     * @return a string Representing the track callsign
      */
     public String getCallsign() {
         return callsign;
     }
 
     /**
-     * Method used to set the target callsign
+     * Method used to set the track callsign
      * Don't change the callsign to blank if it was a good value
      * 
-     * @param val a string Representing the target callsign
+     * @param val a string Representing the track callsign
      */
     public void setCallsign(String val) {
         if (val.equals("") == false) {
@@ -651,18 +673,18 @@ public final class Track implements IConstants {
     }
 
     /**
-     * Method used to return the target octal 4-digit squawk
+     * Method used to return the track octal 4-digit squawk
      *
-     * @return a String Representing the target octal squawk
+     * @return a String Representing the track octal squawk
      */
     public String getSquawk() {
         return squawk;
     }
 
     /**
-     * Method used to set the target octal 4-digit squawk
+     * Method used to set the track octal 4-digit squawk
      *
-     * @param val a String Representing the target octal squawk
+     * @param val a String Representing the track octal squawk
      */
     public void setSquawk(String val) {
         if (val.equals("") == false) {
