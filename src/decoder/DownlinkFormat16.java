@@ -16,7 +16,7 @@ public final class DownlinkFormat16 implements IDF16 {
     private final int ri4;
     private final int bds;
     private final long timestamp;
-    private String icao;
+    private final String icao;
     private final boolean isOnGround;
     private final long mv56;
     private final int[] dataBytes;

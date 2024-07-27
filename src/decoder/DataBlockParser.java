@@ -20,7 +20,7 @@ import parser.DataBlock;
 import parser.ZuluMillis;
 
 /**
- * A class to decode the received packets and put them into tracks
+ * A class to decode the received packets and put them into database tracks
  *
  * This is the main entry point for applications
  */
@@ -79,15 +79,15 @@ public final class DataBlockParser extends Thread {
     private int radarIID;
     private int amplitude;
     //
+    private final Timer timer0;
     private final Timer timer1;
     private final Timer timer2;
     private final Timer timer3;
-    private final Timer targetTimer;
     //
+    private final TimerTask task0;
     private final TimerTask task1;
     private final TimerTask task2;
     private final TimerTask task3;
-    private final TimerTask targetTimeoutTask;
     
     public DataBlockParser(Config cf, LatLon ll, BufferDataBlocks bd, Connection dbc) {
         zulu = new ZuluMillis();
@@ -101,8 +101,7 @@ public final class DataBlockParser extends Thread {
         icao_number = "";
         callsign = "";
         squawk = "";
-        mdhash = "";
-        EOF = false;        
+        mdhash = "";      
 
         targets = new ConcurrentHashMap<>();
         shortDetects = new ConcurrentHashMap<>();
@@ -112,23 +111,16 @@ public final class DataBlockParser extends Thread {
         nconverter = new NConverter();
 
         targetTimeout = config.getDatabaseTargetTimeout() * 60L * 1000L;
-        targetTimeoutTask = new TargetTimeoutThread();
 
-        targetTimer = new Timer();
-        targetTimer.scheduleAtFixedRate(targetTimeoutTask, 0L, RATE1); // Update targets every 30 seconds
+        task0 = new TargetTimeoutTask();
+        task1 = new UpdateReportsTask();
+        task2 = new UpdateTrackQualityTask();
+        task3 = new removeTCASAlertsTask();
 
-        task1 = new UpdateReports();
+        timer0 = new Timer();
         timer1 = new Timer();
-        timer1.scheduleAtFixedRate(task1, 0L, RATE1);
-
-        task2 = new UpdateTrackQuality();
         timer2 = new Timer();
-        timer2.scheduleAtFixedRate(task2, 10L, RATE2);
-        
-        task3 = new removeTCASAlerts();
         timer3 = new Timer();
-//TODO OFF for debugging
-//timer3.scheduleAtFixedRate(task3, 14L, RATE3);
 
         process = new Thread(this);
         process.setName("DataBlockParser");
@@ -138,6 +130,14 @@ public final class DataBlockParser extends Thread {
     @Override
     public void start() {
         process.start();
+        
+        EOF = false;
+        
+        timer0.scheduleAtFixedRate(task0, 0L, RATE1); // Update targets every 30 seconds
+        timer1.scheduleAtFixedRate(task1, 0L, RATE1);
+        timer2.scheduleAtFixedRate(task2, 10L, RATE2);
+//TODO OFF for debugging
+//      timer3.scheduleAtFixedRate(task3, 14L, RATE3);
     }
 
     public void close() {
@@ -145,11 +145,10 @@ public final class DataBlockParser extends Thread {
         
         try {
             db.close();
-        } catch (SQLException e) {
-            System.out.println("DataBlockParser::close Closing Bug " + e.getMessage());
-            System.exit(0);
+        } catch (NullPointerException | SQLException e) {
         }
 
+        timer0.cancel();
         timer1.cancel();
         timer2.cancel();
         timer3.cancel();
@@ -162,7 +161,7 @@ public final class DataBlockParser extends Thread {
      *
      * A TimerTask class to move target to history after fade-out,
      */
-    private class TargetTimeoutThread extends TimerTask {
+    private class TargetTimeoutTask extends TimerTask {
 
         private long time;
         private long timeout;
@@ -258,7 +257,7 @@ public final class DataBlockParser extends Thread {
                     querytt.close();
                 } catch (SQLException tt2) {
                 }
-                System.out.println("TargetTimeoutThread::run targethistory SQL Error: " + update + " " + tt1.getMessage());
+                System.out.println("TargetTimeoutTask::run targethistory SQL Error: " + update + " " + tt1.getMessage());
             }
 
             update = String.format("DELETE FROM target_table WHERE utcupdate <= %d", timeout);
@@ -272,7 +271,7 @@ public final class DataBlockParser extends Thread {
                     querytt.close();
                 } catch (SQLException tt4) {
                 }
-                System.out.println("DataBlockParser::TargetTimeoutThread delete SQL Error: " + update + " " + tt3.getMessage());
+                System.out.println("DataBlockParser::TargetTimeoutTask delete SQL Error: " + update + " " + tt3.getMessage());
             }
         }
     }
@@ -426,7 +425,7 @@ public final class DataBlockParser extends Thread {
      * This will look through the TCAS database every 10 minutes and delete
      * entries that are over 30 minutes old. This is so I can view it manually.
      */
-    private class removeTCASAlerts extends TimerTask {
+    private class removeTCASAlertsTask extends TimerTask {
         @Override
         public void run() {
             long time = zulu.getUTCTime() - (30L * 60L * 1000L); // subtract 30 minutes
@@ -452,7 +451,7 @@ public final class DataBlockParser extends Thread {
      * entries that are over X minutes old.  In that case the target has
      * probably landed or faded-out from coverage.
      */
-    private class UpdateReports extends TimerTask {
+    private class UpdateReportsTask extends TimerTask {
 
         private List<Track> targets;
         private long targetTime;
@@ -492,7 +491,7 @@ public final class DataBlockParser extends Thread {
      * every 30 seconds that the lat/lon position isn't updated. This timer task
      * is run every 5 seconds.
      */
-    private class UpdateTrackQuality extends TimerTask {
+    private class UpdateTrackQualityTask extends TimerTask {
 
         private List<Track> targets;
         private long delta;
@@ -1322,6 +1321,8 @@ public final class DataBlockParser extends Thread {
                         updateTargetOnGround(icao_number, isOnGround, detectTime);
                     }
                     break;
+                default:    // output CSV
+                    System.err.printf("%d,%d,%s%n", df5, amplitude, data);
             }
         }
     }
@@ -1624,8 +1625,8 @@ public final class DataBlockParser extends Thread {
                         }
                     }
                     break;
-                case 19: // Military Squitter
-                    break;
+                case 19:  // Military Squitters
+                   break; // Get a lot of these, but no way to decode
                 case 20:
                     /*
                      * Check data for correct length
@@ -1724,8 +1725,8 @@ public final class DataBlockParser extends Thread {
                         System.err.println(np);
                     }
                     break;
-                default:
-                    System.err.printf("DataBlockParser::decodeData DF: [%d] %s%n", df5, data);
+                default:    // output CSV
+                    System.err.printf("%d,%d,%s%n", df5, amplitude, data);
             }
         }
     }
