@@ -150,6 +150,30 @@ public final class DataBlockParser extends Thread {
         pm.close();
     }
 
+    /*
+     * SQL note to self:
+     *
+     * mysql> select count(*) from position_echo P INNER JOIN tracks T
+     * ON P.icao_number = T.icao_number WHERE active=0;
+     * 
+     * +----------+
+     * | count(*) |
+     * +----------+
+     * |    10856 |
+     * +----------+
+     * 1 row in set (0.01 sec)
+     * 
+     * mysql> select count(*) from position_echo P INNER JOIN tracks T
+     * ON P.icao_number = T.icao_number WHERE active=1;
+     * 
+     * +----------+
+     * | count(*) |
+     * +----------+
+     * |     1415 |
+     * +----------+
+     * 1 row in set (0.00 sec)
+     */
+
     public boolean hasTrack(String icao) throws NullPointerException {
         synchronized (tracks) {
             return tracks.containsKey(icao);
