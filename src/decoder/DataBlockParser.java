@@ -96,6 +96,10 @@ public final class DataBlockParser extends Thread {
 
         radar_site = cf.getRadarSite();
         radarscan = (long) cf.getRadarScanTime() * 1000L;
+        //
+        airport = pa.getAirportName();
+        elevation = pa.getAirportElevation();
+        //
         icao_number = "";
         callsign = "";
         squawk = "";
@@ -116,8 +120,11 @@ public final class DataBlockParser extends Thread {
         task2 = new UpdateTrackQualityTask();
 
         timer1 = new Timer();
+        timer1.scheduleAtFixedRate(task1, 0L, RATE1);
+        
         timer2 = new Timer();
-
+        timer2.scheduleAtFixedRate(task2, 10L, RATE2);
+        
         process = new Thread(this);
         process.setName("DataBlockParser");
         process.setPriority(Thread.NORM_PRIORITY);
@@ -125,15 +132,8 @@ public final class DataBlockParser extends Thread {
 
     @Override
     public void start() {
-        process.start();
-
-        airport = pa.getAirportName();
-        elevation = pa.getAirportElevation();
-
         EOF = false;
-        
-        timer1.scheduleAtFixedRate(task1, 0L, RATE1);
-        timer2.scheduleAtFixedRate(task2, 10L, RATE2);
+        process.start();
     }
 
     public void close() {
@@ -366,12 +366,14 @@ public final class DataBlockParser extends Thread {
                 try {
                     tracktime = track.getUpdatedTime();
 
-                    if (tracktime != 0L) {
-                        // find tracks that haven't been updated in X minutes
-                        delta = Math.abs(currentTime - tracktime);
+                    // find tracks that haven't been updated in X minutes
+                    delta = Math.abs(currentTime - tracktime);
 
-                        if (delta >= trackTimeout) {
+                    if (delta >= trackTimeout) {
+                        try {
                             markTrackInactive(track.getAircraftICAO());
+                        } catch (NullPointerException mt1) {
+                            // punt
                         }
                     }
                 } catch (NullPointerException e2) {
@@ -691,10 +693,10 @@ public final class DataBlockParser extends Thread {
             parseLongDetects();
 
             /*
-             * We now have active tracks to process
+             * We now have tracks to process
              */
             try {
-                List<Track> table = getAllActiveTracks();
+                List<Track> table = getAllTracks();
 
                 if (table.isEmpty() == false) {
                     for (Track trk : table) {

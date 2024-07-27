@@ -128,7 +128,7 @@ public final class TCASAlert {
 
                     threatAltitude = alt.modecDecode(a3, b3, c3, d3);
              
-                    if (threatAltitude != -9999) {
+                    if ((threatAltitude != -9999) && (trackAltitude != -9999)) {
                         threatRelativeAltitude = trackAltitude - threatAltitude;
                     } else {
                         threatRelativeAltitude = -9999;
