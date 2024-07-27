@@ -5,11 +5,11 @@ This application written for the Mode-S Beast Receiver. This is a great little r
 The program processes the serial port data (ignores the Mode-AC if enabled) and creates data structures in order to decode the data. This decoded information is placed in a MySQL database. Multiple receivers can be used, each running this application and using a separate ```radar_site``` identification in the configuration file.
 
 #### Development Repository
-The database is being redesigned. Instead of having a ```target_table``` and a ```target_history``` table, we just have a table of ```targets```.
+The database is being redesigned. Instead of having a ```target_table``` and a ```target_history``` table, we just have a table of ```tracks```.
 
-When new targets are detected, their Mode-S ICAO number is added to the ```icao_number``` table and the decoded basic information saved in the ```target``` table. This table will then reference a ```position_echo``` table. Sooner or later this target will land or fade-out, and the database will mark the target as **inactive**. If it pops-up again, then it is issued a new flight number and marked **active**.
+When new tracks are detected, their Mode-S ICAO number is added to the ```icao_list``` table and the decoded basic information saved in the ```tracks``` table. This table will then reference a ```position_echo``` table. Sooner or later this target will land or fade-out, and the database will mark the target as **inactive**. If it pops-up again, then it is issued a new flight number and marked **active**.
 
-The US registration (N-Number) are also added to the targets after the ICAO number is decoded. These are assigned 1:1 in the US. No other countries are decoded.
+The US registration (N-Number) are also added to the targets after the ICAO number is decoded. These are assigned 1:1 in the US. No other countries are decoded. Callsigns are placed in the ```callsign_list``` table.
 
 #### Running the Application
 You must have MySQL installed. Currently version 9.0 is used for development. Import the ```.sql``` file to create the database, tables, and triggers.
