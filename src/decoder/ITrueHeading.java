@@ -6,7 +6,7 @@ package decoder;
 public interface ITrueHeading {
 
     /**
-     * Calculate true north target heading from the n/s and e/w velocity in knots
+     * Calculate true north track heading from the n/s and e/w velocity in knots
      *
      * @param velocityn_s an integer velocity north/south
      * @param velocitye_w an integer velocity east/west

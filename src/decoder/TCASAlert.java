@@ -7,7 +7,7 @@ package decoder;
  * Comm-B Data Selector (BDS) field equal to 0x30
  *
  * <p>
- * The BDS register 3,0 is used by the target aircraft to send to the ground any
+ * The BDS register 3,0 is used by the track aircraft to send to the ground any
  * TCAS advisories that are threats to this aircraft.
  *
  * <p>
@@ -16,7 +16,7 @@ package decoder;
  */
 public final class TCASAlert {
 
-    private final Altitude alt = new Altitude();
+    private Altitude alt;
     //
     private int threatIdentityData;
     private int threatTypeData;
@@ -77,7 +77,7 @@ public final class TCASAlert {
      */
     private boolean threatTerminated;
 
-    public TCASAlert(long data56, long time, int targetAltitude) {
+    public TCASAlert(long data56, long time, int trackAltitude) {
         tti = 0;
         ara6 = 0;
         rac4 = 0;
@@ -88,9 +88,12 @@ public final class TCASAlert {
         threatRelativeAltitude = -9999;
         detectTime = time;
 
+        alt = new Altitude();
+
         // These fit into an Integer in Java
         threatIdentityData = (int)(data56 & 0x3FFFFFFL);    // 26 bits masked off
         threatTypeData = (int)(data56 >>> 26);              // 30 bits left over
+
         /*
          * TTI Bits:
          * 
@@ -102,10 +105,10 @@ public final class TCASAlert {
         tti = (threatTypeData & 0x3);                               // bit 29,30 Threat Type Indicator
         multipleRA = (((threatTypeData >>> 2) & 0x1) == 1);         // bit 28
         threatTerminated = (((threatTypeData >>> 3) & 0x1) == 1);   // bit 27
-        
+
         singleRA = (((threatTypeData >>> 21) & 0x1) == 1);          // bit 9
         noRA = ((singleRA == false) && (multipleRA == false));
-        
+
         /*
          * Note: singleRA and multipleRA false, means this is only a threat
          * detected, but not to do anything (don't turn, don't climb, don't
@@ -121,43 +124,44 @@ public final class TCASAlert {
                 case 2:     // should receive altitude, bearing, range of threat bits 31 - 56
                     int data13 = (threatIdentityData & 0x1FFF);   // Mode-C Altitude
 
-                    int a3 = ((data13 & 0x0800) >>> 9) + ((data13 & 0x0200) >>> 8) + ((data13 & 0x0080) >>> 7);
-                    int b3 = ((data13 & 0x0020) >>> 3) + ((data13 & 0x0008) >>> 2) + ((data13 & 0x0002) >>> 1);
-                    int c3 = ((data13 & 0x1000) >>> 10) + ((data13 & 0x0400) >>> 9) + ((data13 & 0x0100) >>> 8);
-                    int d3 = ((data13 & 0x0010) >>> 2) + ((data13 & 0x0004) >>> 1) + ((data13 & 0x0001));
+                    boolean qbit1 = ((data13 & 0x0010) == 0x10);      // Q-Bit true means 25ft resolution
+                    boolean mbit1 = ((data13 & 0x0040) == 0x40);      // M-Bit 26 and Q-Bit 28 0 0000 0X0X 0000 m = 0 feet, m = 1 metres
+                    int ac11 = (data13 & 0x000F) | ((data13 & 0x0020) >>> 1) | ((data13 & 0x1F80) >>> 2); // raw 11 bits now
 
-                    threatAltitude = alt.modecDecode(a3, b3, c3, d3);
-             
-                    if (threatAltitude != -9999) {
-                        threatRelativeAltitude = targetAltitude - threatAltitude;
+                    threatAltitude = alt.computeAltitude(ac11, qbit1);
+
+                    if (mbit1 == true) {
+                        threatAltitude *= .3048;   // if m-bit then convert metres to feet (Probably a Russian)
+                    }
+
+                    if ((threatAltitude != -9999) && (trackAltitude != -9999)) {
+                        threatRelativeAltitude = trackAltitude - threatAltitude;
                     } else {
                         threatRelativeAltitude = -9999;
                     }
 
                     int range = ((threatIdentityData >>> 13) & 0x7F); // 7 bits 14 - 20
 
-                    if (range > 0 && range <= 127) {
-                        switch (range) {
-                            case 127:
-                                threatRange = 13.0f;    // greater than 12.55 nmi
-                                break;
-                            case 1:
-                                threatRange = .05f;     // inside .05 nmi
-                                break;
-                            default:
-                                threatRange = (float) (range - 1) / 10.0f;  // 0.1 to 12.5 nmi
-                        }
+                    if (range > 0 && range < 128) {
+                        threatRange = switch (range) {
+                            case 127 -> // greater than 12.55 nmi
+                                13.0f;
+                            case 1 ->   // inside .05 nmi
+                                .05f;
+                            default ->  // 0.1 to 12.5 nmi
+                                (float) (range - 1) / 10.0f;
+                        }; 
                     }
 
                     int bearing = ((threatIdentityData >>> 20) & 0x3F); // 6 bits 21 - 26
 
-                    if (bearing > 0 && bearing <= 60) {
+                    if (bearing > 0 && bearing < 61) {
                         if (bearing == 1) {
                             threatBearing = 0.0f;
                         } else {
-                            threatBearing = bearing * 6.0f;
+                            threatBearing = (float) bearing * 6.0f;
                         }
-                    }
+                    } // else threatBearing = -999.0f;
                 default:
             }
 
@@ -277,13 +281,13 @@ public final class TCASAlert {
     }
 
     /**
-     * Method to return whether the target has multiple threats
+     * Method to return whether the track has multiple threats
      *
      * <p>
-     * true = The target has multiple threats<br>
-     * false = The target has only one threat
+     * true = The track has multiple threats<br>
+     * false = The track has only one threat
      *
-     * @return a boolean representing the targets having more than one threat
+     * @return a boolean representing the tracks having more than one threat
      */
     public boolean getHasMultipleThreats() {
         return (activeRA && multipleRA);
@@ -354,7 +358,7 @@ public final class TCASAlert {
     }
 
     /**
-     * Method to return the range in nautical miles to a threat target
+     * Method to return the range in nautical miles to a threat track
      *
      * <p>
      * The threat range is converted to floating point (.05 minimum to 13.0
@@ -373,7 +377,7 @@ public final class TCASAlert {
     }
 
     /**
-     * Method to return the threat bearing in degrees relative to the targets
+     * Method to return the threat bearing in degrees relative to the tracks
      * nose.
      *
      * <p>
@@ -416,7 +420,7 @@ public final class TCASAlert {
      *
      * <p>
      * The threat altitude returned in the TCAS report is subtracted from the
-     * targets reporting altitude, resulting in a +/- relative difference.
+     * tracks reporting altitude, resulting in a +/- relative difference.
      *
      * <p>
      * A negative value indicates the threat is below<br>

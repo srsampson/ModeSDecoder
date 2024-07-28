@@ -3,8 +3,6 @@
  */
 package decoder;
 
-import java.util.IllegalFormatException;
-
 /*
  * This is the squawk object
  *

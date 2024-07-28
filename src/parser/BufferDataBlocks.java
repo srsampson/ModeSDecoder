@@ -71,7 +71,7 @@ public final class BufferDataBlocks extends Thread {
     /*
      * Push the receive packet onto the queue
      *
-     * There is a lot of duplicate data packets from targets.
+     * There is a lot of duplicate data packets from receiver data.
      */
     private synchronized void pushData(int signal, String data) {
         DataBlock block;

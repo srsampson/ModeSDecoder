@@ -2,8 +2,8 @@
  * ModeSDecoder - A Mode-S/ADS-B Decoder Application for Windows
  *
  * This program connects to a Beast Mode-S Receiver via Serial Port.
- * It reads the Serial Port data and combines data into targets.
- * The targets are then stored and updated in a MySQL Database.
+ * It reads the Serial Port data and combines data into tracks.
+ * The tracks are then stored and updated in a MySQL Database.
  *
  * Public Domain (p) 2024 Steve Sampson, K5OKC
  */
@@ -31,6 +31,7 @@ public final class ModeSDecoder {
     //
     private static String configFile = "modesdecoder.conf";
     private static Config config;
+    private static PressureAltitude pa;
     private static SerialPipe recv;
     private static DataBlockParser parser;
     //
@@ -56,7 +57,11 @@ public final class ModeSDecoder {
 
         config = new Config(configFile);
 
-        PressureAltitude pa = new PressureAltitude(config);   // Start PA data source
+        if (config.getStationAirport().isEmpty() == false) {
+            pa = new PressureAltitude(config);   // Start PA data source
+        } else {
+            pa = null;
+        }
 
         /*
          * Create a pipe between Serial and ProcessData threads
@@ -145,7 +150,7 @@ public final class ModeSDecoder {
             System.exit(0);
         }
         
-        parser = new DataBlockParser(config, receiverLatLon, bufferData, db);  // thread to create List of targets from blocks
+        parser = new DataBlockParser(config, receiverLatLon, bufferData, db, pa);  // main thread
 
         Shutdown sh = new Shutdown(port, comm_input, recv, bufferData, parser);
         Runtime.getRuntime().addShutdownHook(sh);

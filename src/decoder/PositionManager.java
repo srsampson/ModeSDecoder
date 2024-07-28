@@ -120,7 +120,7 @@ public final class PositionManager implements IConstants {
 
         if (lat17 != 0 && lon17 != 0) {
             /*
-             * See if this target is on the table
+             * See if this track is on the table
              */
             if (hasPosition(icao) == true) {
 
@@ -189,10 +189,10 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
-                            if (df.hasTarget(icao)) {
-                                df.updateTargetLatLon(icao, latlon, mode, zulu);
+                            if (df.hasTrack(icao)) {
+                                df.updateTrackLatLon(icao, latlon, mode, zulu);
                             } else {
-                                df.createTargetLatLon(icao, tis, latlon, mode, zulu);
+                                df.createTrackLatLon(icao, tis, latlon, mode, zulu);
                             }
                         }
                     } else if (time == 0L) {
@@ -223,10 +223,10 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
-                            if (df.hasTarget(icao)) {
-                                df.updateTargetLatLon(icao, latlon, mode, zulu);
+                            if (df.hasTrack(icao)) {
+                                df.updateTrackLatLon(icao, latlon, mode, zulu);
                             } else {
-                                df.createTargetLatLon(icao, tis, latlon, mode, zulu);
+                                df.createTrackLatLon(icao, tis, latlon, mode, zulu);
                             }
                         }
                     }
@@ -238,7 +238,7 @@ public final class PositionManager implements IConstants {
                 }
             } else {
                 /*
-                 * Target wasn't on the table so create a new object
+                 * Track wasn't on the table so create a new object
                  */
 
                 addPosition(icao, new Position(icao, zulu, lat17, lon17, cpr1));

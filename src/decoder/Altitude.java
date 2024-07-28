@@ -97,7 +97,7 @@ public final class Altitude {
      * @param rvsm a boolean representing whether 25 foot resolution is being used
      * @return an int representing the altitude in feet or metres
      */
-    private int computeAltitude(int ac11, boolean rvsm) {
+    public int computeAltitude(int ac11, boolean rvsm) {
         if (rvsm == true) {
             return (ac11 * 25) - 1000;
         } else {
@@ -127,51 +127,28 @@ public final class Altitude {
      * @param d an integer representing the D-bits
      * @return an int representing the altitude in feet with 100 foot resolution
      */
-    public int modecDecode(int a, int b, int c, int d) {
+    private int modecDecode(int a, int b, int c, int d) {
         int alt;
         int dab = (grayToBinary((d << 6) + (a << 3) + b) * 500) - 1000;
-        boolean i = (dab & 0x01) == 0;
 
-        if (i) {
-            switch (c) {
-                case 4:
-                    alt = dab + 200;
-                    break;
-                case 6:
-                    alt = dab + 100;
-                    break;
-                case 2:
-                    alt = dab;
-                    break;
-                case 3:
-                    alt = dab - 100;
-                    break;
-                case 1:
-                    alt = dab - 200;
-                    break;
-                default:
-                    alt = -9999;            // case 0, 5, 7 illegal value
-            }
+        if ((dab & 0x01) == 0) {
+            alt = switch (c) {
+                case 4 -> dab + 200;
+                case 6 -> dab + 100;
+                case 2 -> dab;
+                case 3 -> dab - 100;
+                case 1 -> dab - 200;
+                default -> -9999;       // case 0, 5, 7 illegal value
+            };
         } else {
-            switch (c) {
-                case 4:
-                    alt = dab - 200;
-                    break;
-                case 6:
-                    alt = dab - 100;
-                    break;
-                case 2:
-                    alt = dab;
-                    break;
-                case 3:
-                    alt = dab + 100;
-                    break;
-                case 1:
-                    alt = dab + 200;
-                    break;
-                default:
-                    alt = -9999;            // case 0, 5, 7 illegal value
-            }
+            alt = switch (c) {
+                case 4 -> dab - 200;
+                case 6 -> dab - 100;
+                case 2 -> dab;
+                case 3 -> dab + 100;
+                case 1 -> dab + 200;
+                default -> -9999;       // case 0, 5, 7 illegal value
+            };
         }
 
         return alt;
