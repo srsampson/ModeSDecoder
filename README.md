@@ -4,7 +4,7 @@ This application written for the Mode-S Beast Receiver. This is a great little r
 
 The program processes the serial port data (ignores the Mode-AC if enabled) and creates data structures in order to decode the data. This decoded information is placed in a MySQL database. Multiple receivers can be used, each running this application and using a separate ```radar_site``` identification in the configuration file.
 
-#### Development Repository
+#### Development Direction
 The database is being redesigned. Instead of having a ```target_table``` and a ```target_history``` table, we just have a table of ```tracks```. It is not a well thought out design, as I'm not a database expert.
 
 When new tracks are detected, their Mode-S ICAO number is added to the ```icao_list``` table and the decoded basic information saved in the ```tracks``` table. This table will then reference a ```position_echo``` table. Sooner or later this target will land or fade-out, and the database will mark the target as **inactive**. If it pops-up again, then it is marked **active** again.
