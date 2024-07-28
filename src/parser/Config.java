@@ -24,9 +24,9 @@ public final class Config {
     private int radarscan;
     private int radar_site;
     //
-    private float latitude;    // degrees
-    private float longitude;   // degrees
-    private int altitude;
+    private float latitude;     // degrees
+    private float longitude;    // degrees
+    private int elevation;      // feet
     //
     private Properties Props;
     private String userDir;
@@ -47,7 +47,7 @@ public final class Config {
         //
         latitude = 0.0f;
         longitude = 0.0f;
-        altitude = 0;
+        elevation = 0;
         //
         Props = null;
         //
@@ -199,22 +199,20 @@ public final class Config {
                 }
             }
 
-            temp = Props.getProperty("station.altitude");
+            temp = Props.getProperty("station.elevation");
             if (temp == null) {
-                altitude = 0;
-                System.out.println("station.altitude not set, set to 0");
+                elevation = 0;
             } else {
                 try {
-                    altitude = Integer.parseInt(temp.trim());
+                    elevation = Integer.parseInt(temp.trim());
                 } catch (NumberFormatException e) {
-                    altitude = 0;
+                    elevation = 0;
                 }
             }
 
             temp = Props.getProperty("station.airport");
             if (temp == null) {
                 airportName = "";
-                System.out.println("station.airport not set, set to Empty");
             } else {
                 airportName = temp.trim();
             }
@@ -287,8 +285,8 @@ public final class Config {
         return longitude;
     }
 
-    public int getStationAltitude() {
-        return altitude;
+    public int getStationElevation() {
+        return elevation;
     }
 
     public String getStationAirport() {

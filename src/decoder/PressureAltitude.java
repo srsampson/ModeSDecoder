@@ -50,7 +50,7 @@ public class PressureAltitude {
         config = c;
 
         airportAltimeter = 0.0f;
-        airportElevation = config.getStationAltitude();
+        airportElevation = config.getStationElevation();
         airportName = config.getStationAirport();
         utcUpdateTime = 0L;
         pressureAltitude = 0;

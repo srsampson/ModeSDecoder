@@ -61,7 +61,7 @@ CREATE TABLE `position_echo` (
   `position_id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'Position ID',
   `radar_site` int unsigned NOT NULL DEFAULT '0' COMMENT 'Radar Site that generated this position report',
   `icao_number` char(6) NOT NULL COMMENT 'ICAO Number',
-  `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC Time detected',
+  `utcdetect` bigint unsigned NOT NULL  COMMENT 'UTC microseconds',
   `amplitude` int DEFAULT NULL COMMENT 'Receiver Amplitude',
   `radar_iid` int DEFAULT NULL,
   `radar_si` tinyint(1) NOT NULL DEFAULT '0',
@@ -85,7 +85,7 @@ DROP TABLE IF EXISTS `tcas_alerts`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tcas_alerts` (
   `tcas_id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'TCAS ID',
-  `utcdetect` bigint unsigned NOT NULL,
+  `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC microseconds',
   `icao_number` char(6) NOT NULL COMMENT 'ICAO Number',
   `ttibits` int unsigned DEFAULT NULL,
   `threat_icao` char(6) NOT NULL COMMENT 'Threat ICAO ID',
@@ -102,8 +102,10 @@ CREATE TABLE `tcas_alerts` (
   `threat_terminated` tinyint(1) NOT NULL DEFAULT '0',
   `identity_data_raw` varchar(45) DEFAULT NULL,
   `type_data_raw` varchar(45) DEFAULT NULL,
-  PRIMARY KEY (`tcas_id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TCAS Alerts';
+  PRIMARY KEY (`tcas_id`) USING BTREE,
+  KEY `FK_tcas_icao` (`icao_number`),
+  CONSTRAINT `FK_tcas_icao` FOREIGN KEY (`icao_number`) REFERENCES `icao_list` (`icao_number`)
+  ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TCAS Alerts';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -117,8 +119,8 @@ CREATE TABLE `tracks` (
   `track_id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'Track ID',
   `radar_site` int unsigned NOT NULL DEFAULT '0' COMMENT 'Radar Site that generated this target report',
   `icao_number` char(6) NOT NULL COMMENT 'ICAO Number',
-  `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC Time track first detected',
-  `utcupdate` bigint unsigned NOT NULL COMMENT 'UTC Time track last updated',
+  `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC microseconds track first detected',
+  `utcupdate` bigint unsigned NOT NULL COMMENT 'UTC microseconds track last updated',
   `altitude` int DEFAULT NULL COMMENT 'Altitude in feet',
   `altitudedf00` int DEFAULT NULL,
   `altitudedf04` int DEFAULT NULL,
@@ -151,7 +153,7 @@ CREATE TABLE `tracks` (
   `hadSPI` tinyint(1) NOT NULL DEFAULT '0',
   `active` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Active or Inactive Track',
   PRIMARY KEY (`track_id`) USING BTREE,
-  UNIQUE KEY `TrackIDIndex` (`track_id`,`icao_number`,`radar_site`) USING BTREE,
+  UNIQUE KEY `TrackIDIndex` (`icao_number`,`radar_site`) USING BTREE,
   KEY `FK_icao` (`icao_number`),
   CONSTRAINT `FK_icao` FOREIGN KEY (`icao_number`) REFERENCES `icao_list` (`icao_number`)
 ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Track';
