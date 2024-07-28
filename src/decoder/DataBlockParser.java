@@ -950,7 +950,6 @@ public final class DataBlockParser extends Thread {
                             // TODO: Figure out why we get those
                             if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
                                 queryString = String.format("INSERT INTO position_echo ("
-                                        + "flight_id,"
                                         + "radar_site,"
                                         + "icao_number,"
                                         + "utcdetect,"
@@ -963,7 +962,6 @@ public final class DataBlockParser extends Thread {
                                         + "verticalTrend,"
                                         + "onground"
                                         + ") VALUES ("
-                                        + "(SELECT flight_id FROM tracks WHERE icao_number='%s' AND radar_site=%d),"
                                         + "%d,"
                                         + "'%s',"
                                         + "%d,"
@@ -974,8 +972,6 @@ public final class DataBlockParser extends Thread {
                                         + "%d,"
                                         + "%d,"
                                         + "%d)",
-                                        icao_number,
-                                        radar_site,
                                         radar_site,
                                         icao_number,
                                         time,
@@ -1056,8 +1052,6 @@ public final class DataBlockParser extends Thread {
                                         callsign,
                                         icao_number);
 
-                                time = zulu.getUTCTime();
-                                    
                                 query = db.createStatement();
                                 rs = query.executeQuery(queryString);
 
@@ -1069,36 +1063,25 @@ public final class DataBlockParser extends Thread {
 
                                 rs.close();
                                 query.close();
+
+                                /*
+                                 * Does the callsign_list table have a copy of this callsign?
+                                 * Not sure how useful this is, other than to show all the
+                                 * callsigns used by an ICAO ID.
+                                 */
+                                if (exists == 0) {
+                                    // callsign not in table, so add it
+                                    queryString = String.format("INSERT INTO callsign_list (callsign, icao_number)"
+                                        + " VALUES ('%s', '%s')", callsign, icao_number);
+
+                                    query = db.createStatement();
+                                    query.executeUpdate(queryString);
+                                    query.close();
+                                }
                             } catch (SQLException e8) {
-                                rs.close();
                                 query.close();
                                 System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e8.getMessage());
-                                continue;   // skip the following
                             }
-
-                            /*
-                             * Does the callsign_list table have a copy of this callsign?
-                             */
-                            if (exists > 0) {
-                                // yes, update the time
-                                queryString = String.format("UPDATE callsign_list SET utcupdate=%d WHERE callsign='%s' AND icao_number='%s'",
-                                    time, callsign, icao_number);
-                            } else {
-                                // callsign not in table, so add it
-                                queryString = String.format("INSERT INTO callsign_list (callsign,flight_id,icao_number,"
-                                    + "utcdetect,utcupdate) VALUES ('%s',"
-                                    + "(SELECT flight_id FROM tracks WHERE icao_number='%s'),"
-                                    + "'%s',%d,%d)",
-                                    callsign,
-                                    icao_number,
-                                    icao_number,
-                                    time,
-                                    time);
-                            }
-
-                            query = db.createStatement();
-                            query.executeUpdate(queryString);
-                            query.close();
                         }
                     }
                 } // table empty
@@ -1113,7 +1096,7 @@ public final class DataBlockParser extends Thread {
                 Thread.sleep(radarscan);
             } catch (InterruptedException e9) {
             }
-        } //  end of while
+        }
     }
 
     private void parseShortDetects() {
