@@ -300,7 +300,7 @@ public final class DataBlockParser extends Thread {
      * Method to add a new TCAS alert for this track
      * into the database table
      */
-    public void insertTCASAlert(String hexid, long data56, long time) {
+    public void insertTCASAlert(String hexid, int df5, long data56, long time) {
         /*
          * See if this is even a valid track
          */
@@ -308,7 +308,7 @@ public final class DataBlockParser extends Thread {
             Track track = getTrack(hexid);
             int alt16 = track.getAltitudeDF16();  // might be -9999 (null)
 
-            TCASAlert tcas = new TCASAlert(data56, time, alt16);
+            TCASAlert tcas = new TCASAlert(data56, df5, time, alt16);
 
             /*
              * Some TCAS are just advisory, no RA generated
@@ -1319,7 +1319,7 @@ public final class DataBlockParser extends Thread {
                                  * Some planes send TTI = 0 which means nothing to do
                                  */
                                 if ((data30 & 0x3) != 0) {
-                                    insertTCASAlert(icao_number, data56, detectTime);
+                                    insertTCASAlert(icao_number, df5, data56, detectTime);
                                 }
                             }
                         }
@@ -1607,7 +1607,7 @@ public final class DataBlockParser extends Thread {
                                  * Some planes send TTI = 0 which means nothing to do
                                  */
                                 if ((data30 & 0x3) != 0) {
-                                    insertTCASAlert(icao_number, data56, detectTime);
+                                    insertTCASAlert(icao_number, df5, data56, detectTime);
                                 }
                             }
                         }
@@ -1657,7 +1657,7 @@ public final class DataBlockParser extends Thread {
                                      * Some planes send TTI = 0 which means nothing to do
                                      */
                                     if ((data30 & 0x3) != 0) {
-                                        insertTCASAlert(icao_number, data56, detectTime);
+                                        insertTCASAlert(icao_number, df5, data56, detectTime);
                                     }
                             }
                         }

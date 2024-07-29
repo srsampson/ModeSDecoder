@@ -76,7 +76,7 @@ public final class TCASAlert {
      */
     private boolean threatTerminated;
 
-    public TCASAlert(long data56, long time, int trackAltitude) {
+    public TCASAlert(long mv56, int df5, long time, int trackAltitude) {
         tti = 0;
         ara6 = 0;
         rac4 = 0;
@@ -87,13 +87,13 @@ public final class TCASAlert {
         threatRelativeAltitude = -9999;
         detectTime = time;
 
-        dfSource = (int)(data56 >>> 51);
+        dfSource = df5;
 
         alt = new Altitude();
 
         // These fit into an Integer in Java
-        threatIdentityData = (int)(data56 & 0x3FFFFFFL);    // 26 bits masked off
-        threatTypeData = (int)(data56 >>> 26);              // 30 bits left over
+        threatIdentityData = (int)(mv56 & 0x3FFFFFFL);    // 26 bits masked off
+        threatTypeData = (int)(mv56 >>> 26);              // 30 bits left over
 
         /*
          * TTI Bits:
