@@ -32,7 +32,7 @@ CREATE TABLE `callsign_list` (
   UNIQUE KEY `Index_Callsign` (`icao_number`,`callsign_id`),
   KEY `FK_callsign_icao` (`icao_number`),
   CONSTRAINT `FK_callsign_icao` FOREIGN KEY (`icao_number`) REFERENCES `icao_list` (`icao_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsign';
+) ENGINE=InnoDB AUTO_INCREMENT=2066 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Callsign';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -61,7 +61,7 @@ CREATE TABLE `position_echo` (
   `position_id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'Position ID',
   `radar_site` int unsigned NOT NULL DEFAULT '0' COMMENT 'Radar Site that generated this position report',
   `icao_number` char(6) NOT NULL COMMENT 'ICAO Number',
-  `utcdetect` bigint unsigned NOT NULL  COMMENT 'UTC microseconds',
+  `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC microseconds',
   `amplitude` int DEFAULT NULL COMMENT 'Receiver Amplitude',
   `radar_iid` int DEFAULT NULL,
   `radar_si` tinyint(1) NOT NULL DEFAULT '0',
@@ -73,7 +73,7 @@ CREATE TABLE `position_echo` (
   PRIMARY KEY (`position_id`),
   KEY `FK_echo_icao` (`icao_number`),
   CONSTRAINT `FK_echo_icao` FOREIGN KEY (`icao_number`) REFERENCES `icao_list` (`icao_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Target Echoes';
+) ENGINE=InnoDB AUTO_INCREMENT=334 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Target Echoes';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -87,7 +87,8 @@ CREATE TABLE `tcas_alerts` (
   `tcas_id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'TCAS ID',
   `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC microseconds',
   `icao_number` char(6) NOT NULL COMMENT 'ICAO Number',
-  `ttibits` int unsigned DEFAULT NULL,
+  `df_source` int unsigned DEFAULT NULL,
+  `tti_bits` int unsigned DEFAULT NULL,
   `threat_icao` char(6) NOT NULL COMMENT 'Threat ICAO ID',
   `threat_relative_altitude` int DEFAULT NULL,
   `threat_altitude` int DEFAULT NULL,
@@ -105,7 +106,7 @@ CREATE TABLE `tcas_alerts` (
   PRIMARY KEY (`tcas_id`) USING BTREE,
   KEY `FK_tcas_icao` (`icao_number`),
   CONSTRAINT `FK_tcas_icao` FOREIGN KEY (`icao_number`) REFERENCES `icao_list` (`icao_number`)
-  ) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TCAS Alerts';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='TCAS Alerts';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -156,9 +157,8 @@ CREATE TABLE `tracks` (
   UNIQUE KEY `TrackIDIndex` (`icao_number`,`radar_site`) USING BTREE,
   KEY `FK_icao` (`icao_number`),
   CONSTRAINT `FK_icao` FOREIGN KEY (`icao_number`) REFERENCES `icao_list` (`icao_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=0 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Track';
+) ENGINE=InnoDB AUTO_INCREMENT=49 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='Track';
 /*!40101 SET character_set_client = @saved_cs_client */;
-
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -197,4 +197,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-28  5:12:24
+-- Dump completed on 2024-07-29 14:11:18

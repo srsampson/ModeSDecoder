@@ -318,7 +318,8 @@ public final class DataBlockParser extends Thread {
             String update = String.format("INSERT INTO tcas_alerts ("
                     + "icao_number,"
                     + "utcdetect,"
-                    + "ttibits,"
+                    + "df_source,"
+                    + "tti_bits,"
                     + "threat_icao,"
                     + "threat_relative_altitude,"
                     + "threat_altitude,"
@@ -332,12 +333,16 @@ public final class DataBlockParser extends Thread {
                     + "multiple_threats,"
                     + "threat_terminated,"
                     + "identity_data_raw,"
-                    + "type_data_raw) VALUES ("
-                    + "'%s',%d,%d,'%s',NULLIF(%d,-9999),NULLIF(%d,-9999),NULLIF(%.1f,-999.0),NULLIF(%.1f,-999.0),%d,%d,"
-                    + "%d,%d,%d,%d,%d,"
-                    + "'%s','%s')",
+                    + "type_data_raw) "
+                    + "VALUES ('%s',%d,%d,%d,'%s',"
+                    + "NULLIF(%d,-9999),"
+                    + "NULLIF(%d,-9999),"
+                    + "NULLIF(%.1f,-999.0),"
+                    + "NULLIF(%.1f,-999.0),"
+                    + "%d,%d,%d,%d,%d,%d,%d,'%s','%s')",
                     icao_number,
                     tcas.getDetectTime(),
+                    tcas.getDFSource(),
                     tcas.getThreatTypeIndicator(),
                     tcas.getThreatICAOID(),
                     tcas.getThreatRelativeAltitude(),

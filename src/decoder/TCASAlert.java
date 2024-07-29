@@ -3,16 +3,11 @@
  */
 package decoder;
 
-/**
+/*
  * Comm-B Data Selector (BDS) field equal to 0x30
  *
- * <p>
  * The BDS register 3,0 is used by the track aircraft to send to the ground any
  * TCAS advisories that are threats to this aircraft.
- *
- * <p>
- * These TCAS Objects will be placed in database as they come in,
- * and expired after about 1 minute.
  */
 public final class TCASAlert {
 
@@ -22,6 +17,10 @@ public final class TCASAlert {
     private int threatTypeData;
     //
     private long detectTime;
+    /*
+     * DF Source of data
+     */
+    private int dfSource;
     /*
      * Threat Type Indicator (TTI)
      */
@@ -87,6 +86,8 @@ public final class TCASAlert {
         threatAltitude = -9999;
         threatRelativeAltitude = -9999;
         detectTime = time;
+
+        dfSource = (int)(data56 >>> 51);
 
         alt = new Altitude();
 
@@ -177,7 +178,11 @@ public final class TCASAlert {
             rac4 = ((threatIdentityData >>> 4) & 0xF);
         }
     }
-    
+
+    public int getDFSource() {
+        return dfSource;
+    }
+
     /**
      * Method to return the time this threat was detected in Zulu time (UTC)
      *
