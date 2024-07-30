@@ -23,7 +23,7 @@ java -jar ModeSDecoder.jar
 The Mode-S data received has a lot of redundancy in it. Each target may transmit identical information to several radar sites. You will often see three or four transmissions with the same exact data. This application divides the Mode-S into two queues, one for short blocks and one for long. Since the long blocks are used to calculate position, this data is not filtered. On the other hand, the short block duplicates are dropped. This greatly reduces the work of decoding the information, and storing it in the database.
 
 #### TCAS Receiver Data
-The DF16 download format has some interesting TCAS data transmitted, and this is stored in the ```tcas_alert``` table which is referenced to the ```icao_list``` table for both this track ICAO and the threat track ICAO if known.
+The Mode-S long blocks have some interesting TCAS data transmitted, and this is stored in the ```tcas_alert``` table which is referenced to the ```icao_list``` table for both this track ICAO and the threat track ICAO if known.
 
 #### METAR Internet Data
 Airborne tracks transmit their altitude based on a standard 29.92 Hg pressure. This altitude may be higher or lower based on the current airport altimeter. The application connects with a NOAA weather site, and the airport selected in your config file is used to collect the current altimeter. This value is then used to provide a correction based on the Pressure altitude. This data is stored in the ```airport_data``` table. The correction value is stored in the ```tracks``` table for other applications to use.
