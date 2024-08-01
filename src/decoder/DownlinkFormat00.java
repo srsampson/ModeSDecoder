@@ -23,7 +23,7 @@ public final class DownlinkFormat00 implements IDF00 {
     /**
      * Decode the DF00 packets
      *
-     * @param raw56 a string of the raw packet in hexadecimal
+     * @param raw56 a string of the raw 14 hex packet
      * @param time a long representing the UTC time of detection
      */
     public DownlinkFormat00(String raw56, long time) {
@@ -34,8 +34,9 @@ public final class DownlinkFormat00 implements IDF00 {
         icao = "";
         altitude = -9999;
 
+        // remove AP hex
         altitude = alt.decodeAltitude(raw56.substring(0, 8), true);    // true == has the Metre Bit
-
+        
         /*
          * By running the first 32 bits into the CRC, and then XOR the last 24
          * bits, you arrive at the true 6 hex digits Aircraft ID

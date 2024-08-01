@@ -306,15 +306,12 @@ public final class DataBlockParser extends Thread {
          */
         if (hasTrack(hexid)) {
             Track track = getTrack(hexid);
-            int alt16 = track.getAltitudeDF16();  // might be -9999 (null)
 
-            TCASAlert tcas = new TCASAlert(data56, df5, time, alt16);
+            TCASAlert tcas = new TCASAlert(data56, df5, time, track.getAltitude());
 
             /*
              * Some TCAS are just advisory, no RA generated
-             * Note: TCASAlert class only sets time if RA is active.
              */
-            
             String update = String.format("INSERT INTO tcas_alerts ("
                     + "icao_number,"
                     + "utcdetect,"
@@ -330,7 +327,6 @@ public final class DataBlockParser extends Thread {
                     + "active_ra,"
                     + "single_ra,"
                     + "multiple_ra,"
-                    + "multiple_threats,"
                     + "threat_terminated,"
                     + "identity_data_raw,"
                     + "type_data_raw) "
@@ -339,7 +335,7 @@ public final class DataBlockParser extends Thread {
                     + "NULLIF(%d,-9999),"
                     + "NULLIF(%.1f,-999.0),"
                     + "NULLIF(%.1f,-999.0),"
-                    + "%d,%d,%d,%d,%d,%d,%d,'%s','%s')",
+                    + "%d,%d,%d,%d,%d,%d,'%s','%s')",
                     icao_number,
                     tcas.getDetectTime(),
                     tcas.getDFSource(),
@@ -354,7 +350,6 @@ public final class DataBlockParser extends Thread {
                     tcas.getActiveRA() ? 1 : 0,
                     tcas.getSingleRA() ? 1 : 0,
                     tcas.getMultipleRA() ? 1 : 0,
-                    tcas.getHasMultipleThreats() ? 1 : 0,
                     tcas.getThreatTerminated() ? 1 : 0,
                     tcas.getThreatIdentityData(),
                     tcas.getThreatTypeData());
@@ -1009,6 +1004,14 @@ public final class DataBlockParser extends Thread {
                 
                 if (all.isEmpty() == false) {
                     for (Track trk : all) {
+                        /*
+                         * Database might get closed
+                         * on exit or error, so kill thread
+                         */
+                        if (EOF == true) {
+                            break;
+                        }
+
                         icao_number = trk.getAircraftICAO();
                         callsign = trk.getCallsign();
                         String registration = trk.getRegistration();
@@ -1016,7 +1019,7 @@ public final class DataBlockParser extends Thread {
                         if (registration.equals("") == false) {
                             try {
                                 queryString = String.format("SELECT count(*) AS RG FROM icao_list"
-                                    + " WHERE icao_number='%s'", icao_number);
+                                        + " WHERE icao_number='%s'", icao_number);
 
                                 query = db.createStatement();
                                 rs = query.executeQuery(queryString);
@@ -1038,12 +1041,12 @@ public final class DataBlockParser extends Thread {
 
                             if (exists > 0) {
                                 queryString = String.format("UPDATE icao_list SET registration='%s' WHERE icao_number='%s'",
-                                    registration,
-                                    icao_number);
+                                        registration,
+                                        icao_number);
 
-                                    query = db.createStatement();
-                                    query.executeUpdate(queryString);
-                                    query.close();
+                                query = db.createStatement();
+                                query.executeUpdate(queryString);
+                                query.close();
                             }
                         }
 
@@ -1053,7 +1056,7 @@ public final class DataBlockParser extends Thread {
                         if (callsign.equals("") == false) {     // false = has callsign
                             try {
                                 queryString = String.format("SELECT count(*) AS CS FROM callsign_list"
-                                    + " WHERE callsign='%s' AND icao_number='%s'",
+                                        + " WHERE callsign='%s' AND icao_number='%s'",
                                         callsign,
                                         icao_number);
 
@@ -1077,7 +1080,7 @@ public final class DataBlockParser extends Thread {
                                 if (exists == 0) {
                                     // callsign not in table, so add it
                                     queryString = String.format("INSERT INTO callsign_list (callsign, icao_number)"
-                                        + " VALUES ('%s', '%s')", callsign, icao_number);
+                                            + " VALUES ('%s', '%s')", callsign, icao_number);
 
                                     query = db.createStatement();
                                     query.executeUpdate(queryString);

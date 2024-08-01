@@ -263,6 +263,7 @@ public final class DownlinkFormat18 implements IDF18 {
 
                     // Airborne Position with barometric altitude
                     isOnGround = false;
+
                     altitude = alt.decodeAltitude(raw56.substring(0, 8), false);       // false == no Metre bit
                     qBit1 = alt.getQBit();
 

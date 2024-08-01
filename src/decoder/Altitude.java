@@ -27,8 +27,8 @@ public final class Altitude {
      * @param raw32 a string representing the raw (8 hex) bits to decode
      * @param hasMBit a boolean representing the altitude has the metre bit
      * which is true for DF00, DF04, DF16, and DF20, but false for DF17 and DF18,
-     * but only if the altimeter is 25 foot capable.
-     * @return an int representing the altitude
+     *
+     * @return an int representing the altitude or -9999 for null
      */
     public int decodeAltitude(String raw32, boolean hasMBit) {
         int altitude;
@@ -36,17 +36,22 @@ public final class Altitude {
 
         try {
             if (hasMBit == true) {
-                int acmsb1 = Integer.parseInt(raw32.substring(4, 5), 16) & 0x01;
-                int aclsb12 = Integer.parseInt(raw32.substring(5, 8), 16);
-                altbits = ((acmsb1 << 12) | aclsb12) & 0x1FFF;  // DF00, DF04, DF20 13 bits
+                int acmsb1 = Integer.parseInt(raw32.substring(4, 5), 16) & 0x1;
+                int aclsb12 = Integer.parseInt(raw32.substring(5), 16) & 0xFFF;
+                altbits = ((acmsb1 << 12) | aclsb12) & 0x1FFF; // 13 bits
+                
                 qbit1 = ((altbits & 0x0010) == 0x10);      // Q-Bit true means 25ft resolution
                 mbit1 = ((altbits & 0x0040) == 0x40);      // M-Bit 26 and Q-Bit 28 0 0000 0X0X 0000 m = 0 feet, m = 1 metres
+                
                 ac11 = (altbits & 0x000F) | ((altbits & 0x0020) >>> 1) | ((altbits & 0x1F80) >>> 2); // raw 11 bits now
             } else {
-                altbits = Integer.parseInt(raw32.substring(2, 5), 16) & 0x0FFF; // DF17, DF18 12 bits 0000 000X 0000
-                qbit1 = ((altbits & 0x0010) == 0x10);      // Q-Bit true means 25ft resolution
+                // 12 bits starting at substring 2
+                altbits = Integer.parseInt(raw32.substring(2, 5), 16) & 0x0FFF;
+                
+                qbit1 = ((altbits & 0x10) == 0x10); // Q-Bit true 25ft resolution
                 mbit1 = false;
-                ac11 = ((altbits & 0x0FE0) >>> 1) | (altbits & 0x00F);   // 11 bits now, got rid of q-bit
+                
+                ac11 = ((altbits >>> 5) << 4) | (altbits & 0xF); // 11 bits
             }
 
             altitude = computeAltitude(ac11, qbit1);
@@ -66,7 +71,8 @@ public final class Altitude {
      * Method to return altitude given an SSR Mode-C squawk
      * The X-bit has already been removed.
      *
-     * This is available on some receivers that pass SSR data in addition to Mode-S
+     * This is available on Mode-S Beast receivers
+     * that pass SSR Mode-C data in addition to Mode-S
      *
      * 100 foot resolution C1 A1 C2 A2 | C4 A4 B1 D1 | B2 D2 B4 D4
      */

@@ -40,7 +40,7 @@ public final class DownlinkFormat16 implements IDF16 {
 
         // Send the first 32 bits/8 nibbles (altitude is the last 13 bits)
         altitude = alt.decodeAltitude(raw112.substring(0, 8), true);    // true == has the Metre Bit
-
+        
         /*
          * By running the first 32 bits into the CRC, and then XOR the last 24
          * bits, you arrive at the true 6 hex digits Aircraft ID

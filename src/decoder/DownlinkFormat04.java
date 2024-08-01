@@ -39,7 +39,7 @@ public final class DownlinkFormat04 implements IDF04 {
         timestamp = time;
         icao = "";
         altitude = -9999;
-
+        
         altitude = alt.decodeAltitude(raw56.substring(0, 8), true);    // true == has the Metre Bit
 
         /*

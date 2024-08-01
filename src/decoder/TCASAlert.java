@@ -6,8 +6,10 @@ package decoder;
 /*
  * Comm-B Data Selector (BDS) field equal to 0x30
  *
- * The BDS register 3,0 is used by the track aircraft to send to the ground any
+ * The BDS register 3,0 is used to send to the ground any
  * TCAS advisories that are threats to this aircraft.
+ *
+ * I mostly see these coming from DF20 and DF21
  */
 public final class TCASAlert {
 
@@ -68,10 +70,6 @@ public final class TCASAlert {
      */
     boolean activeRA;
     /*
-     * No Threat, Traffic Advisory
-     */
-    boolean noRA;
-    /*
      * Threat Terminated
      */
     private boolean threatTerminated;
@@ -108,7 +106,7 @@ public final class TCASAlert {
         threatTerminated = (((threatTypeData >>> 3) & 0x1) == 1);   // bit 27
 
         singleRA = (((threatTypeData >>> 21) & 0x1) == 1);          // bit 9
-        noRA = ((singleRA == false) && (multipleRA == false));
+
 
         /*
          * Note: singleRA and multipleRA false, means this is only a threat
@@ -117,66 +115,66 @@ public final class TCASAlert {
          */
         activeRA = ((singleRA == true) || (multipleRA == true));
 
-        if (activeRA == true) {
-            switch (tti) {
-                case 1:     // should receive ICAO ID of threat  bits 31 - 54
-                    threatIcaoID = Integer.toString((threatIdentityData >>> 2), 16).toUpperCase();
-                    break;
-                case 2:     // should receive altitude, bearing, range of threat bits 31 - 56
-                    int data13 = (threatIdentityData & 0x1FFF);   // Mode-C Altitude
+        switch (tti) {
+            case 1:     // ICAO ID bits 31 - 54
+                threatIcaoID = Integer.toString((threatIdentityData >>> 2), 16).toUpperCase();
+                break;
+            case 2:     // altitude, bearing, range bits 31 - 56
+                int data13 = (threatIdentityData & 0x1FFF);   // Mode-C Altitude
 
-                    boolean qbit1 = ((data13 & 0x0010) == 0x10);      // Q-Bit true means 25ft resolution
-                    boolean mbit1 = ((data13 & 0x0040) == 0x40);      // M-Bit 26 and Q-Bit 28 0 0000 0X0X 0000 m = 0 feet, m = 1 metres
-                    int ac11 = (data13 & 0x000F) | ((data13 & 0x0020) >>> 1) | ((data13 & 0x1F80) >>> 2); // raw 11 bits now
+                boolean qbit1 = ((data13 & 0x10) == 0x10);      // Q-Bit true means 25ft resolution
+                boolean mbit1 = ((data13 & 0x40) == 0x40);      // M-Bit 26 and Q-Bit 28 0 0000 0X0X 0000 m = 0 feet, m = 1 metres
+                int ac11 = (data13 & 0xF) | ((data13 & 0x20) >>> 1) | ((data13 & 0xFC0) >>> 2); // raw 11 bits now
 
-                    threatAltitude = alt.computeAltitude(ac11, qbit1);
+                threatAltitude = alt.computeAltitude(ac11, qbit1);
 
-                    if (mbit1 == true) {
-                        threatAltitude *= .3048;   // if m-bit then convert metres to feet (Probably a Russian)
-                    }
+                if (mbit1 == true) {
+                    threatAltitude *= .3048;   // if m-bit then convert metres to feet (Probably a Russian)
+                }
 
-                    if ((threatAltitude != -9999) && (trackAltitude != -9999)) {
-                        threatRelativeAltitude = trackAltitude - threatAltitude;
+                if ((threatAltitude != -9999) && (trackAltitude != -9999)) {
+                    threatRelativeAltitude = trackAltitude - threatAltitude;
+                } else {
+                    threatRelativeAltitude = -9999;
+                }
+
+                int range = ((threatIdentityData >>> 6) & 0x7F); // 7 bits 44-50
+
+                if (range > 0 && range < 128) {
+                    threatRange = switch (range) {
+                        case 127 -> // greater than 12.55 nmi
+                            13.0f;
+                        case 1 ->   // inside .05 nmi
+                            0.05f;
+                        case 0 ->
+                            0.0f;
+                        default ->  // 0.1 to 12.5 nmi
+                            (float) (range - 1) / 10.0f;
+                    };
+                } // else threatRange = -999.0f;
+
+                int bearing = (threatIdentityData & 0x3F); // 6 bits 51-56
+
+                if (bearing > 0 && bearing < 61) {
+                    if (bearing == 1) {
+                        threatBearing = 0.0f;
                     } else {
-                        threatRelativeAltitude = -9999;
+                        threatBearing = (float) bearing * 6.0f;
                     }
-
-                    int range = ((threatIdentityData >>> 13) & 0x7F); // 7 bits 14 - 20
-
-                    if (range > 0 && range < 128) {
-                        threatRange = switch (range) {
-                            case 127 -> // greater than 12.55 nmi
-                                13.0f;
-                            case 1 ->   // inside .05 nmi
-                                .05f;
-                            default ->  // 0.1 to 12.5 nmi
-                                (float) (range - 1) / 10.0f;
-                        }; 
-                    }
-
-                    int bearing = ((threatIdentityData >>> 20) & 0x3F); // 6 bits 21 - 26
-
-                    if (bearing > 0 && bearing < 61) {
-                        if (bearing == 1) {
-                            threatBearing = 0.0f;
-                        } else {
-                            threatBearing = (float) bearing * 6.0f;
-                        }
-                    } // else threatBearing = -999.0f;
-                default:
-            }
-
-            /*
-             * Decode the ARA 14 bits (6 usable, rest are for ACAS III)
-             * Bit 9 is used to signify singleRA
-             */
-            ara6 = ((threatIdentityData >>> 8) & 0x3F); // 6 usable bits
-
-            /*
-             * Decode the RAC 4 Bits
-             */
-            rac4 = ((threatIdentityData >>> 4) & 0xF);
+                } // else threatBearing = -999.0f;
+            default:
         }
+
+        /*
+         * Decode the ARA 14 bits (6 usable, rest are for ACAS III)
+         * Bit 9 is used to signify singleRA
+         */
+        ara6 = ((threatIdentityData >>> 8) & 0x3F); // 6 usable bits
+
+        /*
+         * Decode the RAC 4 Bits
+         */
+        rac4 = ((threatIdentityData >>> 4) & 0xF);
     }
 
     public int getDFSource() {
@@ -285,25 +283,8 @@ public final class TCASAlert {
         return rac4;
     }
 
-    /**
-     * Method to return whether the track has multiple threats
-     *
-     * <p>
-     * true = The track has multiple threats<br>
-     * false = The track has only one threat
-     *
-     * @return a boolean representing the tracks having more than one threat
-     */
-    public boolean getHasMultipleThreats() {
-        return (activeRA && multipleRA);
-    }
-
     public boolean getActiveRA() {
         return activeRA;
-    }
-
-    public boolean getNoRA() {
-        return noRA;
     }
 
     public boolean getSingleRA() {
@@ -374,7 +355,7 @@ public final class TCASAlert {
      * 1 = Range is inside .05 nmi<br>
      * 2...126 = .1 to 12.5 nmi (n - 1) / 10 nmi<br>
      * 127 = Range greater than 12.55 nmi
-     *
+     * 
      * @return a float representing the range to a threat in nautical miles
      */
     public float getThreatRange() {
@@ -406,15 +387,10 @@ public final class TCASAlert {
 
     /**
      * Method to return the threat altitude in feet
-     *
-     * <p>
-     * The threat altitude is in a Mode-C altitude form, and is converted to
-     * feet, with a 100 foot resolution.
      * 
-     * Returns -9999 for null
+     * -9999 for no altitude received, or null
      *
-     * @return an integer representing the threat altitude in feet (100 foot
-     * resolution)
+     * @return an integer representing the threat altitude
      */
     public int getThreatAltitude() {
         return threatAltitude;
@@ -430,7 +406,7 @@ public final class TCASAlert {
      * <p>
      * A negative value indicates the threat is below<br>
      * A positive value indicates the threat is above
-     * -9999 for null
+     * -9999 for no altitude received, or null
      * 
      * @return an integer representing relative altitude in feet to the threat
      */
@@ -439,10 +415,10 @@ public final class TCASAlert {
     }
     
     public String getThreatIdentityData() {
-        return Integer.toString(threatIdentityData, 16);
+        return Integer.toString(threatIdentityData, 16).toUpperCase();
     }
     
     public String getThreatTypeData() {
-        return Integer.toString(threatTypeData, 16);
+        return Integer.toString(threatTypeData, 16).toUpperCase();
     }
 }
