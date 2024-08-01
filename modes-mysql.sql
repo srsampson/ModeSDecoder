@@ -99,7 +99,6 @@ CREATE TABLE `tcas_alerts` (
   `active_ra` tinyint(1) NOT NULL DEFAULT '0',
   `single_ra` tinyint(1) NOT NULL DEFAULT '0',
   `multiple_ra` tinyint(1) NOT NULL DEFAULT '0',
-  `multiple_threats` tinyint(1) NOT NULL DEFAULT '0',
   `threat_terminated` tinyint(1) NOT NULL DEFAULT '0',
   `identity_data_raw` varchar(45) DEFAULT NULL,
   `type_data_raw` varchar(45) DEFAULT NULL,
@@ -197,4 +196,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-07-29 14:11:18
+-- Dump completed on 2024-08-01  8:15:19
