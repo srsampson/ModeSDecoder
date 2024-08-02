@@ -42,7 +42,7 @@ public final class Config {
         airportName = "";
         radarscan = 10;      // value 3 simulates 20 RPM antenna, 10 would be 6 RPM
         radar_site = 0;
-        databaseTrackTimeout = 3;    // 3 minutes
+        databaseTrackTimeout = 1;    // 1 minute
         amplitude = 0;
         //
         latitude = 0.0f;
@@ -113,13 +113,13 @@ public final class Config {
 
             temp = Props.getProperty("db.tracktimeout");
             if (temp == null) {
-                databaseTrackTimeout = 3;
-                System.out.println("db.tracktimeout not set, set to 3 minutes");
+                databaseTrackTimeout = 1;
+                System.out.println("db.tracktimeout not set, set to 1 minute");
             } else {
                 try {
                     databaseTrackTimeout = Integer.parseInt(temp.trim());
                 } catch (NumberFormatException e6) {
-                    databaseTrackTimeout = 3;
+                    databaseTrackTimeout = 1;
                 }
             }
 
