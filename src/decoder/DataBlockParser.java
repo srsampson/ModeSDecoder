@@ -42,8 +42,6 @@ public final class DataBlockParser extends Thread {
     private DataBlock dbk;
     //
     private final Connection db;
-    private Statement query;
-    private Statement querytt;
     private final Config config;
 
     private final int radar_site;
@@ -96,7 +94,7 @@ public final class DataBlockParser extends Thread {
 
         radar_site = cf.getRadarSite();
         radarscan = (long) cf.getRadarScanTime() * 1000L;
-        //
+
         if (pa == null) {
             airport = "";
             elevation = 0;
@@ -104,12 +102,12 @@ public final class DataBlockParser extends Thread {
             airport = pa.getAirportName();            
             elevation = pa.getAirportElevation();
         }
-        //
+
         icao_number = "";
         callsign = "";
         squawk = "";
         mdhash = "";      
-        airport = "";
+        airport = "";   // TODO Add to table
         elevation = 0;
 
         tracks = new ConcurrentHashMap<>();
@@ -138,6 +136,7 @@ public final class DataBlockParser extends Thread {
     @Override
     public void start() {
         EOF = false;
+        initializeTracks();
         process.start();
     }
 
@@ -178,6 +177,18 @@ public final class DataBlockParser extends Thread {
      * +----------+
      * 1 row in set (0.00 sec)
      */
+
+    /*
+     * On startup make sure all tracks are set to non-active
+     */
+    public void initializeTracks() {
+        String queryString = String.format("UPDATE modes.tracks SET active=0");
+
+        try (Statement query = db.createStatement()) {
+            query.executeUpdate(queryString);
+        } catch (SQLException it1) {
+        }
+    }
 
     public boolean hasTrack(String icao) throws NullPointerException {
         synchronized (tracks) {
@@ -312,7 +323,7 @@ public final class DataBlockParser extends Thread {
             /*
              * Some TCAS are just advisory, no RA generated
              */
-            String update = String.format("INSERT INTO tcas_alerts ("
+            String queryString = String.format("INSERT INTO tcas_alerts ("
                     + "icao_number,"
                     + "utcdetect,"
                     + "df_source,"
@@ -354,16 +365,10 @@ public final class DataBlockParser extends Thread {
                     tcas.getThreatIdentityData(),
                     tcas.getThreatTypeData());
 
-            try {
-                querytt = db.createStatement();
-                querytt.executeUpdate(update);
-                querytt.close();
-            } catch (SQLException tt3) {
-                try {
-                    querytt.close();
-                } catch (SQLException tt4) {
-                }
-                System.out.println("DataBlockParser::insertTCASAlert insert SQL Error: " + update + " " + tt3.getMessage());
+            try (Statement query = db.createStatement()) {
+                query.executeUpdate(queryString);
+            } catch (SQLException t3) {
+                System.out.println("DataBlockParser::insertTCASAlert insert SQL Error: " + queryString + " " + t3.getMessage());
             }
         }
     }
@@ -673,14 +678,13 @@ public final class DataBlockParser extends Thread {
      */
     @Override
     public void run() {
-        ResultSet rs = null;
-        String queryString = null;
+        String queryString;
         int ground, exists;
         long time;
 
         while (EOF == false) {
             int qsize = buf.getQueueSize();
-            
+
             if (qsize == 0) {
                 continue;
             }
@@ -688,9 +692,7 @@ public final class DataBlockParser extends Thread {
             /*
              * The compression rate for duplicates is pretty large.
              * For 3000 track reports, about 2000 are duplicates.
-             */
-
-            /*
+             *
              * Start with a fresh sheet each radar scan
              */
             shortDetects.clear();
@@ -724,329 +726,301 @@ public final class DataBlockParser extends Thread {
             /*
              * We now have tracks to process
              */
-            try {
-                List<Track> table = getAllTracks();
+            List<Track> table = getAllTracks();
 
-                if (table.isEmpty() == false) {
-                    for (Track trk : table) {
-                        time = trk.getUpdatedTime();
-                        trk.setUpdated(false);  // reset the updated boolean
+            if (table.isEmpty() == false) {
+                for (Track trk : table) {
+                    time = trk.getUpdatedTime();
+                    trk.setUpdated(false);  // reset the updated boolean
 
-                        icao_number = trk.getAircraftICAO();
+                    icao_number = trk.getAircraftICAO();
 
-                        /*
-                         * See if this ICAO exists yet in the track table, and
-                         * has our radar ID. If it does, we can do an update, and
-                         * if not we will do an insert.
-                         */
-                        try {
-                            queryString = String.format("SELECT count(*) AS TC FROM tracks WHERE icao_number='%s' AND radar_site=%d",
-                                    icao_number, radar_site);
+                    /*
+                     * See if this ICAO exists yet in the track table, and
+                     * has our radar ID. If it does, we can do an update, and
+                     * if not we will do an insert.
+                     */
+                    queryString = String.format("SELECT count(*) AS TC FROM tracks WHERE icao_number='%s' AND radar_site=%d",
+                            icao_number, radar_site);
 
-                            query = db.createStatement();
-                            rs = query.executeQuery(queryString);
+                    exists = 0;
 
-                            if (rs.next() == true) {
-                                exists = rs.getInt("TC");
-                            } else {
-                                exists = 0;
-                            }
-
-                            rs.close();
-                            query.close();
-                        } catch (SQLException e3) {
-                            try {
-                                if (rs != null) {
-                                    rs.close();
-                                }
-                            } catch (SQLException e4) {
-                            }
-                            query.close();
-                            continue;   // this is not good, so end pass
+                    try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                        if (rs.next() == true) {
+                            exists = rs.getInt("TC");
                         }
+                    } catch (SQLException e3) {
+                    }
 
-                        if ((trk.getOnGround() == true) || (trk.getVirtualOnGround() == true)) {
-                            ground = 1;
-                        } else {
-                            ground = 0;
-                        }
+                    if ((trk.getOnGround() == true) || (trk.getVirtualOnGround() == true)) {
+                        ground = 1;
+                    } else {
+                        ground = 0;
+                    }
 
-                        if (exists > 0) {         // track exists
-                            queryString = String.format("UPDATE tracks SET utcupdate=%d,"
-                                    + "amplitude=%d,"
-                                    + "radar_iid=NULLIF(%d, -99),"
-                                    + "radar_si=%d,"
-                                    + "altitude=NULLIF(%d, -9999),"
-                                    + "altitudedf00=NULLIF(%d, -9999),"
-                                    + "altitudedf04=NULLIF(%d, -9999),"
-                                    + "altitudedf16=NULLIF(%d, -9999),"
-                                    + "altitudedf17=NULLIF(%d, -9999),"
-                                    + "altitudedf18=NULLIF(%d, -9999),"
-                                    + "altitudedf20=NULLIF(%d, -9999),"
-                                    + "groundSpeed=NULLIF(%.1f, -999.0),"
-                                    + "groundTrack=NULLIF(%.1f, -999.0),"
-                                    + "gsComputed=NULLIF(%.1f, -999.0),"
-                                    + "gtComputed=NULLIF(%.1f, -999.0),"
-                                    + "callsign='%s',"
-                                    + "latitude=NULLIF(%f, -999.0),"
-                                    + "longitude=NULLIF(%f, -999.0),"
-                                    + "verticalRate=NULLIF(%d, -9999),"
-                                    + "verticalTrend=%d,"
-                                    + "quality=%d,"
-                                    + "squawk='%s',"
-                                    + "alert=%d,"
-                                    + "emergency=%d,"
-                                    + "spi=%d,"
-                                    + "onground=%d,"
-                                    + "hijack=%d,"
-                                    + "comm_out=%d,"
-                                    + "hadAlert=%d,"
-                                    + "hadEmergency=%d,"
-                                    + "hadSPI=%d,"
-                                    + "active=%d"
-                                    + " WHERE icao_number='%s' AND radar_site=%d",
-                                    time,
-                                    trk.getAmplitude(),
-                                    trk.getRadarIID(),
-                                    trk.getRadarSI() ? 1 : 0,
-                                    trk.getAltitude(),
-                                    trk.getAltitudeDF00(),
-                                    trk.getAltitudeDF04(),
-                                    trk.getAltitudeDF16(),
-                                    trk.getAltitudeDF17(),
-                                    trk.getAltitudeDF18(),
-                                    trk.getAltitudeDF20(),
-                                    trk.getGroundSpeed(),
-                                    trk.getGroundTrack(),
-                                    trk.getComputedGroundSpeed(),
-                                    trk.getComputedGroundTrack(),
-                                    trk.getCallsign(),
-                                    trk.getLatitude(),
-                                    trk.getLongitude(),
-                                    trk.getVerticalRate(),
-                                    trk.getVerticalTrend(),
-                                    trk.getTrackQuality(),
-                                    trk.getSquawk(),
-                                    trk.getAlert() ? 1 : 0,
-                                    trk.getEmergency() ? 1 : 0,
-                                    trk.getSPI() ? 1 : 0,
-                                    ground,
-                                    trk.getHijack() ? 1 : 0,
-                                    trk.getCommOut() ? 1 : 0,
-                                    trk.getHadAlert() ? 1 : 0,
-                                    trk.getHadEmergency() ? 1 : 0,
-                                    trk.getHadSPI() ? 1 : 0,
-                                    trk.getActive() ? 1 : 0,
-                                    icao_number,
-                                    radar_site);
-                        } else {                // track doesn't exist
-                            queryString = String.format("INSERT INTO tracks ("
-                                    + "icao_number,"
+                    if (exists > 0) {         // track exists
+                        queryString = String.format("UPDATE tracks SET utcupdate=%d,"
+                                + "amplitude=%d,"
+                                + "radar_iid=NULLIF(%d, -99),"
+                                + "radar_si=%d,"
+                                + "altitude=NULLIF(%d, -9999),"
+                                + "altitudedf00=NULLIF(%d, -9999),"
+                                + "altitudedf04=NULLIF(%d, -9999),"
+                                + "altitudedf16=NULLIF(%d, -9999),"
+                                + "altitudedf17=NULLIF(%d, -9999),"
+                                + "altitudedf18=NULLIF(%d, -9999),"
+                                + "altitudedf20=NULLIF(%d, -9999),"
+                                + "groundSpeed=NULLIF(%.1f, -999.0),"
+                                + "groundTrack=NULLIF(%.1f, -999.0),"
+                                + "gsComputed=NULLIF(%.1f, -999.0),"
+                                + "gtComputed=NULLIF(%.1f, -999.0),"
+                                + "callsign='%s',"
+                                + "latitude=NULLIF(%f, -999.0),"
+                                + "longitude=NULLIF(%f, -999.0),"
+                                + "verticalRate=NULLIF(%d, -9999),"
+                                + "verticalTrend=%d,"
+                                + "quality=%d,"
+                                + "squawk='%s',"
+                                + "alert=%d,"
+                                + "emergency=%d,"
+                                + "spi=%d,"
+                                + "onground=%d,"
+                                + "hijack=%d,"
+                                + "comm_out=%d,"
+                                + "hadAlert=%d,"
+                                + "hadEmergency=%d,"
+                                + "hadSPI=%d,"
+                                + "active=%d"
+                                + " WHERE icao_number='%s' AND radar_site=%d",
+                                time,
+                                trk.getAmplitude(),
+                                trk.getRadarIID(),
+                                trk.getRadarSI() ? 1 : 0,
+                                trk.getAltitude(),
+                                trk.getAltitudeDF00(),
+                                trk.getAltitudeDF04(),
+                                trk.getAltitudeDF16(),
+                                trk.getAltitudeDF17(),
+                                trk.getAltitudeDF18(),
+                                trk.getAltitudeDF20(),
+                                trk.getGroundSpeed(),
+                                trk.getGroundTrack(),
+                                trk.getComputedGroundSpeed(),
+                                trk.getComputedGroundTrack(),
+                                trk.getCallsign(),
+                                trk.getLatitude(),
+                                trk.getLongitude(),
+                                trk.getVerticalRate(),
+                                trk.getVerticalTrend(),
+                                trk.getTrackQuality(),
+                                trk.getSquawk(),
+                                trk.getAlert() ? 1 : 0,
+                                trk.getEmergency() ? 1 : 0,
+                                trk.getSPI() ? 1 : 0,
+                                ground,
+                                trk.getHijack() ? 1 : 0,
+                                trk.getCommOut() ? 1 : 0,
+                                trk.getHadAlert() ? 1 : 0,
+                                trk.getHadEmergency() ? 1 : 0,
+                                trk.getHadSPI() ? 1 : 0,
+                                trk.getActive() ? 1 : 0,
+                                icao_number,
+                                radar_site);
+                    } else {                // track doesn't exist
+                        queryString = String.format("INSERT INTO tracks ("
+                                + "icao_number,"
+                                + "radar_site,"
+                                + "utcdetect,"
+                                + "utcupdate,"
+                                + "amplitude,"
+                                + "radar_iid,"
+                                + "radar_si,"
+                                + "altitude,"
+                                + "altitudedf00,"
+                                + "altitudedf04,"
+                                + "altitudedf16,"
+                                + "altitudedf17,"
+                                + "altitudedf18,"
+                                + "altitudedf20,"
+                                + "groundSpeed,"
+                                + "groundTrack,"
+                                + "gsComputed,"
+                                + "gtComputed,"
+                                + "callsign,"
+                                + "latitude,"
+                                + "longitude,"
+                                + "verticalRate,"
+                                + "verticalTrend,"
+                                + "quality,"
+                                + "squawk,"
+                                + "alert,"
+                                + "emergency,"
+                                + "spi,"
+                                + "onground,"
+                                + "hijack,"
+                                + "comm_out,"
+                                + "hadAlert,"
+                                + "hadEmergency,"
+                                + "hadSPI,"
+                                + "active) "
+                                + "VALUES ('%s',%d,%d,%d,%d,"
+                                + "NULLIF(%d, -99), %d," // radarIID & SI
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%.1f,-999.0),"
+                                + "NULLIF(%.1f,-999.0),"
+                                + "NULLIF(%.1f,-999.0),"
+                                + "NULLIF(%.1f,-999.0),"
+                                + "'%s',"
+                                + "NULLIF(%f, -999.0),"
+                                + "NULLIF(%f, -999.0),"
+                                + "NULLIF(%d, -9999),"
+                                + "%d,"
+                                + "%d,"
+                                + "'%s',"
+                                + "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
+                                icao_number,
+                                radar_site,
+                                time,
+                                time,
+                                trk.getAmplitude(),
+                                trk.getRadarIID(),
+                                trk.getRadarSI() ? 1 : 0,
+                                trk.getAltitude(),
+                                trk.getAltitudeDF00(),
+                                trk.getAltitudeDF04(),
+                                trk.getAltitudeDF16(),
+                                trk.getAltitudeDF17(),
+                                trk.getAltitudeDF18(),
+                                trk.getAltitudeDF20(),
+                                trk.getGroundSpeed(),
+                                trk.getGroundTrack(),
+                                trk.getComputedGroundSpeed(),
+                                trk.getComputedGroundTrack(),
+                                trk.getCallsign(),
+                                trk.getLatitude(),
+                                trk.getLongitude(),
+                                trk.getVerticalRate(),
+                                trk.getVerticalTrend(),
+                                trk.getTrackQuality(),
+                                trk.getSquawk(),
+                                trk.getAlert() ? 1 : 0,
+                                trk.getEmergency() ? 1 : 0,
+                                trk.getSPI() ? 1 : 0,
+                                ground,
+                                trk.getHijack() ? 1 : 0,
+                                trk.getCommOut() ? 1 : 0,
+                                trk.getHadAlert() ? 1 : 0,
+                                trk.getHadEmergency() ? 1 : 0,
+                                trk.getHadSPI() ? 1 : 0,
+                                trk.getActive() ? 1 : 0);
+                    }
+
+                    try (Statement query = db.createStatement()) {
+                        query.executeUpdate(queryString);
+                    } catch (SQLException t3) {
+                        System.out.println("DataBlockParser::run insert/update tracks table Error: " + queryString + " " + t3.getMessage());
+                    }
+
+                    if (trk.getUpdatePosition() == true) {
+                        trk.setUpdatePosition(false);
+
+                        // Safety check, we don't want NULL's
+                        // TODO: Figure out why we get those
+                        if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
+                            queryString = String.format("INSERT INTO position_echo ("
                                     + "radar_site,"
+                                    + "icao_number,"
                                     + "utcdetect,"
-                                    + "utcupdate,"
                                     + "amplitude,"
                                     + "radar_iid,"
                                     + "radar_si,"
-                                    + "altitude,"
-                                    + "altitudedf00,"
-                                    + "altitudedf04,"
-                                    + "altitudedf16,"
-                                    + "altitudedf17,"
-                                    + "altitudedf18,"
-                                    + "altitudedf20,"
-                                    + "groundSpeed,"
-                                    + "groundTrack,"
-                                    + "gsComputed,"
-                                    + "gtComputed,"
-                                    + "callsign,"
                                     + "latitude,"
                                     + "longitude,"
-                                    + "verticalRate,"
+                                    + "altitude,"
                                     + "verticalTrend,"
-                                    + "quality,"
-                                    + "squawk,"
-                                    + "alert,"
-                                    + "emergency,"
-                                    + "spi,"
-                                    + "onground,"
-                                    + "hijack,"
-                                    + "comm_out,"
-                                    + "hadAlert,"
-                                    + "hadEmergency,"
-                                    + "hadSPI,"
-                                    + "active) "
-                                    + "VALUES ('%s',%d,%d,%d,%d,"
-                                    + "NULLIF(%d, -99), %d," // radarIID & SI
-                                    + "NULLIF(%d, -9999),"
-                                    + "NULLIF(%d, -9999),"
-                                    + "NULLIF(%d, -9999),"
-                                    + "NULLIF(%d, -9999),"
-                                    + "NULLIF(%d, -9999),"
-                                    + "NULLIF(%d, -9999),"
-                                    + "NULLIF(%d, -9999),"
-                                    + "NULLIF(%.1f,-999.0),"
-                                    + "NULLIF(%.1f,-999.0),"
-                                    + "NULLIF(%.1f,-999.0),"
-                                    + "NULLIF(%.1f,-999.0),"
-                                    + "'%s',"
-                                    + "NULLIF(%f, -999.0),"
-                                    + "NULLIF(%f, -999.0),"
-                                    + "NULLIF(%d, -9999),"
-                                    + "%d,"
+                                    + "onground"
+                                    + ") VALUES ("
                                     + "%d,"
                                     + "'%s',"
-                                    + "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
-                                    icao_number,
+                                    + "%d,"
+                                    + "%d," // amplitude
+                                    + "NULLIF(%d, -99), %d," // radariid & radarsi
+                                    + "%f,"
+                                    + "%f,"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "%d)",
                                     radar_site,
-                                    time,
+                                    icao_number,
                                     time,
                                     trk.getAmplitude(),
                                     trk.getRadarIID(),
                                     trk.getRadarSI() ? 1 : 0,
-                                    trk.getAltitude(),
-                                    trk.getAltitudeDF00(),
-                                    trk.getAltitudeDF04(),
-                                    trk.getAltitudeDF16(),
-                                    trk.getAltitudeDF17(),
-                                    trk.getAltitudeDF18(),
-                                    trk.getAltitudeDF20(),
-                                    trk.getGroundSpeed(),
-                                    trk.getGroundTrack(),
-                                    trk.getComputedGroundSpeed(),
-                                    trk.getComputedGroundTrack(),
-                                    trk.getCallsign(),
                                     trk.getLatitude(),
                                     trk.getLongitude(),
-                                    trk.getVerticalRate(),
+                                    trk.getAltitude(),
                                     trk.getVerticalTrend(),
-                                    trk.getTrackQuality(),
-                                    trk.getSquawk(),
-                                    trk.getAlert() ? 1 : 0,
-                                    trk.getEmergency() ? 1 : 0,
-                                    trk.getSPI() ? 1 : 0,
-                                    ground,
-                                    trk.getHijack() ? 1 : 0,
-                                    trk.getCommOut() ? 1 : 0,
-                                    trk.getHadAlert() ? 1 : 0,
-                                    trk.getHadEmergency() ? 1 : 0,
-                                    trk.getHadSPI() ? 1 : 0,
-                                    trk.getActive() ? 1 : 0);
-                        }
+                                    ground);
 
-                        try {
-                            query = db.createStatement();
-                            query.executeUpdate(queryString);
-                            query.close();
-                        } catch (SQLException e5) {
-                            query.close();
-                            System.out.println("DataBlockParser::run insert/update tracks table Error: " + queryString + " " + e5.getMessage());
-                        }
-
-                        if (trk.getUpdatePosition() == true) {
-                            trk.setUpdatePosition(false);
-
-                            // Safety check, we don't want NULL's
-                            // TODO: Figure out why we get those
-                            if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
-                                queryString = String.format("INSERT INTO position_echo ("
-                                        + "radar_site,"
-                                        + "icao_number,"
-                                        + "utcdetect,"
-                                        + "amplitude,"
-                                        + "radar_iid,"
-                                        + "radar_si,"
-                                        + "latitude,"
-                                        + "longitude,"
-                                        + "altitude,"
-                                        + "verticalTrend,"
-                                        + "onground"
-                                        + ") VALUES ("
-                                        + "%d,"
-                                        + "'%s',"
-                                        + "%d,"
-                                        + "%d,"     // amplitude
-                                        + "NULLIF(%d, -99), %d," // radariid & radarsi
-                                        + "%f,"
-                                        + "%f,"
-                                        + "%d,"
-                                        + "%d,"
-                                        + "%d)",
-                                        radar_site,
-                                        icao_number,
-                                        time,
-                                        trk.getAmplitude(),
-                                        trk.getRadarIID(),
-                                        trk.getRadarSI() ? 1 : 0,
-                                        trk.getLatitude(),
-                                        trk.getLongitude(),
-                                        trk.getAltitude(),
-                                        trk.getVerticalTrend(),
-                                        ground);
-
-                                try {
-                                    query = db.createStatement();
-                                    query.executeUpdate(queryString);
-                                    query.close();
-                                } catch (SQLException e6) {
-                                    query.close();
-                                    System.out.println("DataBlockParser::run query position_echo Error: " + queryString + " " + e6.getMessage());
-                                }
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e6) {
+                                System.out.println("DataBlockParser::run query position_echo Error: " + queryString + " " + e6.getMessage());
                             }
                         }
                     }
                 }
+            }
 
-                /*
+            /*
                  * We now have all tracks to process callsigns
-                 */
-                List<Track> all = getAllTracks();
-                
-                if (all.isEmpty() == false) {
-                    for (Track trk : all) {
-                        /*
+             */
+            List<Track> all = getAllTracks();
+
+            if (all.isEmpty() == false) {
+                for (Track trk : all) {
+                    /*
                          * Database might get closed
                          * on exit or error, so kill thread
-                         */
-                        if (EOF == true) {
-                            break;
+                     */
+                    if (EOF == true) {
+                        break;
+                    }
+
+                    icao_number = trk.getAircraftICAO();
+                    callsign = trk.getCallsign();
+                    String registration = trk.getRegistration();
+
+                    if (registration.equals("") == false) {
+
+                        queryString = String.format("SELECT count(*) AS RG FROM icao_list"
+                                + " WHERE icao_number='%s'", icao_number);
+
+                        exists = 0;
+
+                        try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                            if (rs.next() == true) {
+                                exists = rs.getInt("RG");
+                            }
+                        } catch (SQLException e7) {
+                            System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e7.getMessage());
+                            continue;   // skip the following
                         }
 
-                        icao_number = trk.getAircraftICAO();
-                        callsign = trk.getCallsign();
-                        String registration = trk.getRegistration();
+                        if (exists > 0) {
+                            queryString = String.format("UPDATE icao_list SET registration='%s' WHERE icao_number='%s'",
+                                    registration,
+                                    icao_number);
 
-                        if (registration.equals("") == false) {
-                            try {
-                                queryString = String.format("SELECT count(*) AS RG FROM icao_list"
-                                        + " WHERE icao_number='%s'", icao_number);
-
-                                query = db.createStatement();
-                                rs = query.executeQuery(queryString);
-
-                                if (rs.next() == true) {
-                                    exists = rs.getInt("RG");
-                                } else {
-                                    exists = 0;
-                                }
-
-                                rs.close();
-                                query.close();
-                            } catch (SQLException e7) {
-                                rs.close();
-                                query.close();
-                                System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e7.getMessage());
-                                continue;   // skip the following
-                            }
-
-                            if (exists > 0) {
-                                queryString = String.format("UPDATE icao_list SET registration='%s' WHERE icao_number='%s'",
-                                        registration,
-                                        icao_number);
-
-                                query = db.createStatement();
+                            try (Statement query = db.createStatement()) {
                                 query.executeUpdate(queryString);
-                                query.close();
+                            } catch (SQLException e77) {
                             }
                         }
 
@@ -1054,55 +1028,47 @@ public final class DataBlockParser extends Thread {
                          * Does this track have a callsign?
                          */
                         if (callsign.equals("") == false) {     // false = has callsign
-                            try {
-                                queryString = String.format("SELECT count(*) AS CS FROM callsign_list"
-                                        + " WHERE callsign='%s' AND icao_number='%s'",
-                                        callsign,
-                                        icao_number);
+                            queryString = String.format("SELECT count(*) AS CS FROM callsign_list"
+                                    + " WHERE callsign='%s' AND icao_number='%s'",
+                                    callsign,
+                                    icao_number);
 
-                                query = db.createStatement();
-                                rs = query.executeQuery(queryString);
+                            exists = 0;
 
+                            try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
                                 if (rs.next() == true) {
                                     exists = rs.getInt("CS");
-                                } else {
-                                    exists = 0;
                                 }
+                            } catch (SQLException e89) {
+                            }
 
-                                rs.close();
-                                query.close();
+                            /*
+                             * Does the callsign_list table have a copy of this callsign?
+                             * Not sure how useful this is, other than to show all the
+                             * callsigns used by an ICAO ID.
+                             */
+                            if (exists == 0) {
+                                // callsign not in table, so add it
+                                queryString = String.format("INSERT INTO callsign_list (callsign, icao_number)"
+                                        + " VALUES ('%s', '%s')", callsign, icao_number);
 
-                                /*
-                                 * Does the callsign_list table have a copy of this callsign?
-                                 * Not sure how useful this is, other than to show all the
-                                 * callsigns used by an ICAO ID.
-                                 */
-                                if (exists == 0) {
-                                    // callsign not in table, so add it
-                                    queryString = String.format("INSERT INTO callsign_list (callsign, icao_number)"
-                                            + " VALUES ('%s', '%s')", callsign, icao_number);
-
-                                    query = db.createStatement();
+                                try (Statement query = db.createStatement()) {
                                     query.executeUpdate(queryString);
-                                    query.close();
+                                } catch (SQLException e90) {
+                                    System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e90.getMessage());
                                 }
-                            } catch (SQLException e8) {
-                                query.close();
-                                System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e8.getMessage());
                             }
                         }
                     }
                 } // table empty
-            } catch (NullPointerException | SQLException g1) {
-                // No tracks updated
-            }
 
-            /*
-             * Simulate radar RPM
-             */
-            try {
-                Thread.sleep(radarscan);
-            } catch (InterruptedException e9) {
+                /*
+                 * Simulate radar RPM
+                 */
+                try {
+                    Thread.sleep(radarscan);
+                } catch (InterruptedException e9) {
+                }
             }
         }
     }

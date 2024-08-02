@@ -36,6 +36,7 @@ public final class Altitude {
 
         try {
             if (hasMBit == true) {
+                // 13 bits
                 int acmsb1 = Integer.parseInt(raw32.substring(4, 5), 16) & 0x1;
                 int aclsb12 = Integer.parseInt(raw32.substring(5), 16) & 0xFFF;
                 altbits = ((acmsb1 << 12) | aclsb12) & 0x1FFF; // 13 bits
@@ -54,10 +55,10 @@ public final class Altitude {
                 ac11 = ((altbits >>> 5) << 4) | (altbits & 0xF); // 11 bits
             }
 
-            altitude = computeAltitude(ac11, qbit1);
-
-            if (mbit1) {
-                altitude *= .3048;   // if m-bit then convert metres to feet (Probably a Russian)
+            if (mbit1 == true) {
+                altitude = (int) ((float)ac11 * 3.2808f); // convert metres to feet
+            } else {
+                altitude = computeAltitude(ac11, qbit1);                
             }
         } catch (IndexOutOfBoundsException | NumberFormatException e) {
             System.out.printf("Altitude::decodeAltitude exception [%s], %s%n", raw32, e.getMessage());
@@ -90,6 +91,27 @@ public final class Altitude {
 
             return -9999;
         }
+
+        return modecDecode(a, b, c, d);
+    }
+
+    /*
+     * Method to return altitude given the raw coded 11 bits
+     * This is used by TCAS which is a real shit-show
+     *
+     * Bit D1 and X bit removed
+     *
+     * @param ac11 an int representing the coded altitude
+     *
+     * @return an int representing the altitude in feet
+     */
+    public int computeAltitude(int ac11) {
+        // 100 foot resolution C1 A1 C2 | A2 C4 A4 B1 | B2 D2 B4 D4
+
+        int a = ((ac11 & 0x0200) >>> 7) | ((ac11 & 0x0080) >>> 6) | ((ac11 & 0x0020) >>> 5);  // A1 A2 A4
+        int b = ((ac11 & 0x0010) >>> 2) | ((ac11 & 0x0008) >>> 2) | ((ac11 & 0x0002) >>> 1);  // B1 B2 B4
+        int c = ((ac11 & 0x0400) >>> 8) | ((ac11 & 0x0100) >>> 7) | ((ac11 & 0x0040) >>> 6);  // C1 C2 C4
+        int d = ((ac11 & 0x0004) >>> 1) | (ac11 & 0x0001);                                    // XX D2 D4
 
         return modecDecode(a, b, c, d);
     }

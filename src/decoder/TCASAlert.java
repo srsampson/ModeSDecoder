@@ -15,8 +15,8 @@ public final class TCASAlert {
 
     private Altitude alt;
     //
-    private int threatIdentityData;
-    private int threatTypeData;
+    private int threatIdentityData26;
+    private int threatTypeData30;
     //
     private long detectTime;
     /*
@@ -90,8 +90,8 @@ public final class TCASAlert {
         alt = new Altitude();
 
         // These fit into an Integer in Java
-        threatIdentityData = (int)(mv56 & 0x3FFFFFFL);    // 26 bits masked off
-        threatTypeData = (int)(mv56 >>> 26);              // 30 bits left over
+        threatIdentityData26 = (int)(mv56 & 0x3FFFFFFL);    // 26 bits masked off
+        threatTypeData30 = (int)(mv56 >>> 26);              // 30 bits left over
 
         /*
          * TTI Bits:
@@ -101,11 +101,11 @@ public final class TCASAlert {
          * 10 Threat identity data contains altitude, range, and bearing
          * 11 Not assigned
          */
-        tti = (threatTypeData & 0x3);                               // bit 29,30 Threat Type Indicator
-        multipleRA = (((threatTypeData >>> 2) & 0x1) == 1);         // bit 28
-        threatTerminated = (((threatTypeData >>> 3) & 0x1) == 1);   // bit 27
+        tti = (threatTypeData30 & 0x3);                               // bit 29,30 Threat Type Indicator
+        multipleRA = (((threatTypeData30 >>> 2) & 0x1) == 1);         // bit 28
+        threatTerminated = (((threatTypeData30 >>> 3) & 0x1) == 1);   // bit 27
 
-        singleRA = (((threatTypeData >>> 21) & 0x1) == 1);          // bit 9
+        singleRA = (((threatTypeData30 >>> 21) & 0x1) == 1);          // bit 9
 
 
         /*
@@ -117,20 +117,19 @@ public final class TCASAlert {
 
         switch (tti) {
             case 1:     // ICAO ID bits 31 - 54
-                threatIcaoID = Integer.toString((threatIdentityData >>> 2), 16).toUpperCase();
+                threatIcaoID = Integer.toString((threatIdentityData26 >>> 2), 16).toUpperCase();
                 break;
-            case 2:     // altitude, bearing, range bits 31 - 56
-                int data13 = (threatIdentityData & 0x1FFF);   // Mode-C Altitude
-
-                boolean qbit1 = ((data13 & 0x10) == 0x10);      // Q-Bit true means 25ft resolution
-                boolean mbit1 = ((data13 & 0x40) == 0x40);      // M-Bit 26 and Q-Bit 28 0 0000 0X0X 0000 m = 0 feet, m = 1 metres
-                int ac11 = (data13 & 0xF) | ((data13 & 0x20) >>> 1) | ((data13 & 0xFC0) >>> 2); // raw 11 bits now
-
-                threatAltitude = alt.computeAltitude(ac11, qbit1);
-
-                if (mbit1 == true) {
-                    threatAltitude *= .3048;   // if m-bit then convert metres to feet (Probably a Russian)
-                }
+            case 2:     // altitude, range, bearing bits 31 - 56
+                /*
+                 * Altitude Encoding
+                 * Bit              31 32 33 34 35 36 37 38 39 40 41 42 43
+                 * Mode C code bit  C1 A1 C2 A2 C4 A4  0 B1 D1 B2 D2 B4 D4
+                 */        
+                int tmp13 = (threatIdentityData26 >>> 13);   // Mode-C Altitude
+                int tmp5 = ((tmp13 & 0x2F) >>> 5) << 4; // Move bit 38 to 39, no D1
+                int ac11 = ((tmp13 >> 7) << 5) | (tmp5 & 0x1F); // drop bit 37, 39
+                
+                threatAltitude = alt.computeAltitude(ac11);
 
                 if ((threatAltitude != -9999) && (trackAltitude != -9999)) {
                     threatRelativeAltitude = trackAltitude - threatAltitude;
@@ -138,7 +137,7 @@ public final class TCASAlert {
                     threatRelativeAltitude = -9999;
                 }
 
-                int range = ((threatIdentityData >>> 6) & 0x7F); // 7 bits 44-50
+                int range = ((threatIdentityData26 >>> 6) & 0x7F); // 7 bits 44-50
 
                 if (range > 0 && range < 128) {
                     threatRange = switch (range) {
@@ -153,7 +152,7 @@ public final class TCASAlert {
                     };
                 } // else threatRange = -999.0f;
 
-                int bearing = (threatIdentityData & 0x3F); // 6 bits 51-56
+                int bearing = (threatIdentityData26 & 0x3F); // 6 bits 51-56
 
                 if (bearing > 0 && bearing < 61) {
                     if (bearing == 1) {
@@ -169,12 +168,12 @@ public final class TCASAlert {
          * Decode the ARA 14 bits (6 usable, rest are for ACAS III)
          * Bit 9 is used to signify singleRA
          */
-        ara6 = ((threatIdentityData >>> 8) & 0x3F); // 6 usable bits
+        ara6 = ((threatIdentityData26 >>> 8) & 0x3F); // 6 usable bits
 
         /*
          * Decode the RAC 4 Bits
          */
-        rac4 = ((threatIdentityData >>> 4) & 0xF);
+        rac4 = ((threatIdentityData26 >>> 4) & 0xF);
     }
 
     public int getDFSource() {
@@ -415,10 +414,10 @@ public final class TCASAlert {
     }
     
     public String getThreatIdentityData() {
-        return Integer.toString(threatIdentityData, 16).toUpperCase();
+        return Integer.toString(threatIdentityData26, 16).toUpperCase();
     }
     
     public String getThreatTypeData() {
-        return Integer.toString(threatTypeData, 16).toUpperCase();
+        return Integer.toString(threatTypeData30, 16).toUpperCase();
     }
 }
