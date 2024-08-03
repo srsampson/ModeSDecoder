@@ -320,11 +320,15 @@ public final class DataBlockParser extends Thread {
      * track has probably landed or faded-out from coverage.
      *
      * Note: Only active tracks are affected.
+     *
+     * First the database entry is marked inactive, and then the local
+     * track is removed from the queue.
      */
     private class UpdateActiveTracksTask extends TimerTask {
 
         private List<Track> tracks;
         private long tracktime;
+        private String icao;
 
         @Override
         public void run() {
@@ -340,11 +344,20 @@ public final class DataBlockParser extends Thread {
             for (Track track : tracks) {
                 try {
                     tracktime = track.getUpdatedTime();
+                    icao = track.getAircraftICAO();
 
                     // find tracks that haven't been updated in X minutes
                     delta = Math.abs(currentTime - tracktime);
 
                     if (delta >= trackTimeout) {    // default 1 minute
+                        String queryString = String.format("UPDATE modes.tracks "
+                                + "SET active=0 WHERE icao_number='%s'", icao);
+
+                        try (Statement query = db.createStatement()) {
+                            query.executeUpdate(queryString);
+                        } catch (SQLException e77) {
+                        }
+
                         try {
                             removeTrack(track.getAircraftICAO());
                         } catch (NullPointerException mt1) {
