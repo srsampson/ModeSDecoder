@@ -5,14 +5,14 @@ This application written for the Mode-S Beast Receiver. This is a great little r
 The program processes the serial port data (ignores the Mode-AC if enabled) and creates data structures in order to decode the data. This decoded information is placed in a MySQL database. Multiple receivers can be used, each running this application and using a separate ```radar_site``` identification in the configuration file.
 
 #### Development Direction
-The database is being redesigned. Instead of having a ```target_table``` and a ```target_history``` table, we just have a table of ```tracks```. It is not a well thought out design, as I'm not a database expert.
+The database has a table of ```tracks```. It is not a well thought out design, as I'm not a database expert. But the design will change as I learn more.
 
-When new tracks are detected, their Mode-S ICAO number is added to the ```icao_list``` table and the decoded basic information saved in the ```tracks``` table. This table will then reference a ```position_echo``` table. Sooner or later this target will land or fade-out, and the database will mark the target as **inactive**. If it pops-up again, then it is marked **active** again.
+When new tracks are detected, their Mode-S ICAO number is added to the ```icao_list``` table by a trigger, and the decoded Mode-S information saved in the ```tracks``` table. This table references ICAO numbers in ```position_echo``` table. Sooner or later this target will land or fade-out, and the database will mark the target as **inactive**. If it pops-up again, then it is marked **active** again.
 
-The US registration (N-Number) are also added to the targets after the ICAO number is decoded. These are assigned 1:1 in the US. No other countries are decoded. Callsigns are placed in the ```callsign_list``` table. I'm not sure what use this serves, but maybe a list of all the callsigns used by an ICAO ID is interesting.
+The US registration (N-Number) are also added to the targets after the ICAO number is received. These are assigned 1:1 in the US. No other countries are decoded. Callsigns are placed in the ```callsign_list``` table. I'm not sure what use this serves, but maybe a list of all the callsigns used by an ICAO ID is interesting.
 
 #### Running the Application
-You must have MySQL installed. Currently version 9.0 is used for development. Import the ```.sql``` file to create the database, tables, and triggers.
+You must have MySQL installed. Currently version 9.0 is used for development. Import the ```.sql``` file to create the database, tables, and trigger.
 
 You will need OpenJDK 64-bit Java version 22 or newer. Create a directory for the application, and move the ```lib``` and ```.jar``` file into it. Also copy the ```.conf``` file and edit it. The ```lib``` directory contains two files: the serial port connector, and the database connector. The application won't run without them. Your Windows ```PATH``` setting will also need to be modified to include the Java Home directory. Start the program on the command-line using:
 ```
@@ -26,7 +26,7 @@ The Mode-S data received has a lot of redundancy in it. Each target may transmit
 The Mode-S long blocks have some interesting TCAS data transmitted, and this is stored in the ```tcas_alert``` table which is referenced to the ```icao_list``` table for both this track ICAO and the threat track ICAO if known.
 
 #### METAR Internet Data
-Airborne tracks transmit their altitude based on a standard 29.92 Hg pressure. This altitude may be higher or lower based on the current airport altimeter. The application connects with a NOAA weather site, and the airport selected in your config file is used to collect the current altimeter. This value is then used to provide a correction based on the Pressure altitude. This data is stored in the ```airport_data``` table. The correction value is stored in the ```tracks``` table for other applications to use.
+Airborne tracks transmit their altitude based on a standard 29.92 Hg pressure. This altitude may be higher or lower based on the current airport altimeter. The application connects with a NOAA weather site, and the airport selected in your config file is used to collect the current altimeter. This value is then used to provide a correction based on the Pressure altitude. This data is stored in the ```airport_data``` table. The correction value is stored in the ```tracks``` table for other applications to use. (TODO).
 
 If there is no airport listed in the ```.conf``` configuration file, this feature is not turned on, and nulls are inserted. This may be desireable if the site has no Internet access.
 
