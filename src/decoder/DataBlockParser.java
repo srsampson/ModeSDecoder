@@ -25,7 +25,7 @@ import parser.ZuluMillis;
  */
 public final class DataBlockParser extends Thread {
 
-    private static final long RATE1 = 30L * 1000L;              // 30 seconds
+    private static final long RATE1 = 60L * 1000L;              // 60 seconds
     private static final long RATE2 = 5L * 1000L;               // 5 seconds
     //
     private final ConcurrentHashMap<String, Track> tracks;
@@ -240,7 +240,7 @@ public final class DataBlockParser extends Thread {
        /*
         * Assuming it was copied to the database
         */
-        String queryString = String.format("UPDATE modes.tracks SET active='0' WHERE icao_number='%s'", icao);
+        String queryString = String.format("UPDATE modes.tracks SET active = 0 WHERE icao_number='%s'", icao);
 
         try (Statement query = db.createStatement()) {
             query.executeUpdate(queryString);
@@ -315,7 +315,7 @@ public final class DataBlockParser extends Thread {
     }
 
     /*
-     * This will look through the Track table every 30 seconds and mark
+     * This will look through the Track table every minute and mark
      * inactive entries that are over X minutes old.  In that case the
      * track has probably landed or faded-out from coverage.
      *
@@ -328,7 +328,6 @@ public final class DataBlockParser extends Thread {
 
         private List<Track> tracks;
         private long tracktime;
-        private String icao;
 
         @Override
         public void run() {
@@ -344,20 +343,11 @@ public final class DataBlockParser extends Thread {
             for (Track track : tracks) {
                 try {
                     tracktime = track.getUpdatedTime();
-                    icao = track.getAircraftICAO();
 
                     // find tracks that haven't been updated in X minutes
                     delta = Math.abs(currentTime - tracktime);
 
                     if (delta >= trackTimeout) {    // default 1 minute
-                        String queryString = String.format("UPDATE modes.tracks "
-                                + "SET active=0 WHERE icao_number='%s'", icao);
-
-                        try (Statement query = db.createStatement()) {
-                            query.executeUpdate(queryString);
-                        } catch (SQLException e77) {
-                        }
-
                         try {
                             removeTrack(track.getAircraftICAO());
                         } catch (NullPointerException mt1) {
