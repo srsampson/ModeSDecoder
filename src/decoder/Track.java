@@ -59,7 +59,6 @@ public final class Track implements IConstants {
     private boolean updatePosition;
     private boolean isLocal;            // Track is from one of our radars/not remote
     private boolean isRelayed;          // Track has been relayed by a ground site (TIS-B)
-    private boolean active;         // track receiving updates
 
     /**
      * A track is the complete data structure of the ICAO ID (icao).
@@ -103,11 +102,11 @@ public final class Track implements IConstants {
         trackQuality = 0;
         updatedPositionTime = 0L;
         updatedTime = 0L;
+        //
         alert = emergency = spi = hadAlert
                 = hadEmergency = hadSPI = si = hijack = comm_out = false;
         updated = updatePosition = false;
         isOnGround = isVirtOnGround = false;
-        active = false;
     }
 
     /**
@@ -149,26 +148,6 @@ public final class Track implements IConstants {
      */
     public int getTrackQuality() {
         return trackQuality;
-    }
-    
-    /**
-     * Method to set the track active
-     * (receiving updates, not landed or faded).
-     *
-     * @param val a boolean which signals the track is active
-     */
-    public void setActive(boolean val) {
-        active = val;
-    }
-
-    /**
-     * Method to check if the track is still active
-     * (receiving updates, not landed or faded).
-     *
-     * @return boolean which signals if the track is still active
-     */
-    public boolean getActive() {
-        return active;
     }
 
     /**
@@ -563,12 +542,7 @@ public final class Track implements IConstants {
     public int getAltitude() {
 
         /*
-         * Return the altitude in this order: DF00, DF17 (ADS-B),
-         * DF04, DF16 (TCAS), DF18 (TIS-B)
-         * 
-         * Note: DF20 doesn't change often enough to display it
-         * 
-         * Note: TCAS DF00 and Mode-S DF04 are short packets, and more apt to be
+         * TCAS DF00 and Mode-S DF04 are short packets, and more apt to be
          * decoded than the long packets
          * 
          * Note: It's a toss really, as I see ADS-B and TCAS leading/lagging each other
@@ -584,6 +558,8 @@ public final class Track implements IConstants {
             return altitudeDF16;
         } else if (altitudeDF18 != -9999) {
             return altitudeDF18;
+        } else if (altitudeDF20 != -9999) {
+            return altitudeDF20;
         }
         
         // punt

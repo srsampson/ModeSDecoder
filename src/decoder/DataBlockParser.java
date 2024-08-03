@@ -38,12 +38,13 @@ public final class DataBlockParser extends Thread {
     private final PositionManager pm;
     private final NConverter nconverter;
     private final ZuluMillis zulu;
-    private static PressureAltitude pa;
+    private final PressureAltitude pa;
     private DataBlock dbk;
     //
     private final Connection db;
     private final Config config;
-
+    //
+    
     private final int radar_site;
     private final long trackTimeout;
     private final long radarscan;
@@ -92,8 +93,8 @@ public final class DataBlockParser extends Thread {
         db = dbc;
         pa = p;
 
-        radar_site = cf.getRadarSite();
         radarscan = (long) cf.getRadarScanTime() * 1000L;
+        radar_site = cf.getRadarSite();
 
         if (pa == null) {
             airport = "";
@@ -182,7 +183,7 @@ public final class DataBlockParser extends Thread {
      * On startup make sure all tracks are set to non-active
      */
     public void initializeTracks() {
-        String queryString = String.format("UPDATE modes.tracks SET active=0");
+        String queryString = String.format("UPDATE modes.tracks SET active = 0");
 
         try (Statement query = db.createStatement()) {
             query.executeUpdate(queryString);
@@ -218,61 +219,6 @@ public final class DataBlockParser extends Thread {
     }
 
     /**
-     * Method to return a collection of all active tracks.
-     * (tracks still receiving updates, and not landed or faded).
-     *
-     * @return a list representing all the tracks that are active
-     */
-    public List<Track> getAllActiveTracks() throws NullPointerException {
-        List<Track> result = new ArrayList<>();
-        List<Track> tracklist;
-        
-        try {
-            tracklist = getAllTracks();
-        } catch (NullPointerException e) {
-            return result;  // empty
-        }
-
-        if (tracklist.isEmpty() == false) {
-            for (Track track : tracklist) {
-                if (track.getActive() == true) {
-                    result.add(track);
-                }
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Probably not used
-     * 
-     * Method to return a collection of all active updated tracks.
-     *
-     * @return a list representing all the tracks that have been updated
-     */
-    public List<Track> getAllActiveUpdatedTracks() throws NullPointerException {
-        List<Track> result = new ArrayList<>();
-        List<Track> tracklist;
-        
-        try {
-            tracklist = getAllActiveTracks();
-        } catch (NullPointerException e) {
-            return result;  // empty
-        }
-
-        if (tracklist.isEmpty() == false) {
-            for (Track track : tracklist) {
-                if (track.getUpdated() == true) {
-                    result.add(track);
-                }
-            }
-        }
-        
-        return result;
-    }
-
-    /**
      * Put track on queue after being created or updated
      *
      * @param icao a String representing the Aircraft ID
@@ -284,27 +230,22 @@ public final class DataBlockParser extends Thread {
        }
     }
 
-    /*
-     * Probably no use case
-     */
-    public void markTrackActive(String icao) throws NullPointerException {
+    public void removeTrack(String icao) throws NullPointerException {
        synchronized (tracks) {
             if (tracks.containsKey(icao) == true) {
-                Track track = tracks.get(icao);
-                track.setActive(true);
-                addTrack(icao, track);
+                tracks.remove(icao);
             }
-       }
-    }
-    
-    public void markTrackInactive(String icao) throws NullPointerException {
-       synchronized (tracks) {
-            if (tracks.containsKey(icao) == true) {
-                Track track = tracks.get(icao);
-                track.setActive(false);
-                addTrack(icao, track);
-            }
-       }
+        }
+
+       /*
+        * Assuming it was copied to the database
+        */
+        String queryString = String.format("UPDATE modes.tracks SET active='0' WHERE icao_number='%s'", icao);
+
+        try (Statement query = db.createStatement()) {
+            query.executeUpdate(queryString);
+        } catch (SQLException e77) {
+        }
     }
 
     /*
@@ -323,7 +264,7 @@ public final class DataBlockParser extends Thread {
             /*
              * Some TCAS are just advisory, no RA generated
              */
-            String queryString = String.format("INSERT INTO tcas_alerts ("
+            String queryString = String.format("INSERT INTO modes.tcas_alerts ("
                     + "icao_number,"
                     + "utcdetect,"
                     + "df_source,"
@@ -391,7 +332,7 @@ public final class DataBlockParser extends Thread {
             long delta;
 
             try {
-                tracks = getAllActiveTracks();
+                tracks = getAllTracks();
             } catch (NullPointerException te) {
                 return; // No tracks found
             }
@@ -403,9 +344,9 @@ public final class DataBlockParser extends Thread {
                     // find tracks that haven't been updated in X minutes
                     delta = Math.abs(currentTime - tracktime);
 
-                    if (delta >= trackTimeout) {
+                    if (delta >= trackTimeout) {    // default 1 minute
                         try {
-                            markTrackInactive(track.getAircraftICAO());
+                            removeTrack(track.getAircraftICAO());
                         } catch (NullPointerException mt1) {
                             // punt
                         }
@@ -439,7 +380,7 @@ public final class DataBlockParser extends Thread {
             String icao;
 
             try {
-                tracks = getAllActiveTracks();
+                tracks = getAllTracks();
             } catch (NullPointerException te) {
                 return; // No tracks found
             }
@@ -650,24 +591,15 @@ public final class DataBlockParser extends Thread {
     }
 
     public void updateTrackLatLon(String hexid, LatLon latlon, int mode, long time) {
-        try {
-            Track track = getTrack(hexid);
-            track.setPosition(latlon, mode, time);
-            track.setUpdatedTime(time);
-            addTrack(hexid, track);
-        } catch (NullPointerException np) {
-            System.err.println(np);
-        }
-    }
-
-    public void createTrackLatLon(String hexid, boolean tis, LatLon latlon, int mode, long time) {
-        try {
-            Track track = new Track(hexid, tis);
-            track.setPosition(latlon, mode, time);
-            track.setUpdatedTime(time);
-            addTrack(hexid, track);
-        } catch (NullPointerException np) {
-            System.err.println(np);
+        if (hasTrack(hexid) == true) {
+            try {
+                Track track = getTrack(hexid);
+                track.setPosition(latlon, mode, time);
+                track.setUpdatedTime(time);
+                addTrack(hexid, track);
+            } catch (NullPointerException np) {
+                System.err.println(np);
+            }
         }
     }
 
@@ -740,7 +672,7 @@ public final class DataBlockParser extends Thread {
                      * has our radar ID. If it does, we can do an update, and
                      * if not we will do an insert.
                      */
-                    queryString = String.format("SELECT count(*) AS TC FROM tracks WHERE icao_number='%s' AND radar_site=%d",
+                    queryString = String.format("SELECT count(*) AS TC FROM modes.tracks WHERE icao_number='%s' AND radar_site=%d",
                             icao_number, radar_site);
 
                     exists = 0;
@@ -759,7 +691,7 @@ public final class DataBlockParser extends Thread {
                     }
 
                     if (exists > 0) {         // track exists
-                        queryString = String.format("UPDATE tracks SET utcupdate=%d,"
+                        queryString = String.format("UPDATE modes.tracks SET utcupdate=%d,"
                                 + "amplitude=%d,"
                                 + "radar_iid=NULLIF(%d, -99),"
                                 + "radar_si=%d,"
@@ -790,7 +722,7 @@ public final class DataBlockParser extends Thread {
                                 + "hadAlert=%d,"
                                 + "hadEmergency=%d,"
                                 + "hadSPI=%d,"
-                                + "active=%d"
+                                + "active='1'"
                                 + " WHERE icao_number='%s' AND radar_site=%d",
                                 time,
                                 trk.getAmplitude(),
@@ -823,11 +755,10 @@ public final class DataBlockParser extends Thread {
                                 trk.getHadAlert() ? 1 : 0,
                                 trk.getHadEmergency() ? 1 : 0,
                                 trk.getHadSPI() ? 1 : 0,
-                                trk.getActive() ? 1 : 0,
                                 icao_number,
                                 radar_site);
                     } else {                // track doesn't exist
-                        queryString = String.format("INSERT INTO tracks ("
+                        queryString = String.format("INSERT INTO modes.tracks ("
                                 + "icao_number,"
                                 + "radar_site,"
                                 + "utcdetect,"
@@ -863,7 +794,8 @@ public final class DataBlockParser extends Thread {
                                 + "hadEmergency,"
                                 + "hadSPI,"
                                 + "active) "
-                                + "VALUES ('%s',%d,%d,%d,%d,"
+                                + "VALUES ('%s',%d,"
+                                + "%d,%d,%d,"
                                 + "NULLIF(%d, -99), %d," // radarIID & SI
                                 + "NULLIF(%d, -9999),"
                                 + "NULLIF(%d, -9999),"
@@ -883,7 +815,7 @@ public final class DataBlockParser extends Thread {
                                 + "%d,"
                                 + "%d,"
                                 + "'%s',"
-                                + "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
+                                + "%d,%d,%d,%d,%d,%d,%d,%d,%d,'1')",
                                 icao_number,
                                 radar_site,
                                 time,
@@ -917,8 +849,7 @@ public final class DataBlockParser extends Thread {
                                 trk.getCommOut() ? 1 : 0,
                                 trk.getHadAlert() ? 1 : 0,
                                 trk.getHadEmergency() ? 1 : 0,
-                                trk.getHadSPI() ? 1 : 0,
-                                trk.getActive() ? 1 : 0);
+                                trk.getHadSPI() ? 1 : 0);
                     }
 
                     try (Statement query = db.createStatement()) {
@@ -933,9 +864,9 @@ public final class DataBlockParser extends Thread {
                         // Safety check, we don't want NULL's
                         // TODO: Figure out why we get those
                         if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
-                            queryString = String.format("INSERT INTO position_echo ("
-                                    + "radar_site,"
+                            queryString = String.format("INSERT INTO modes.position_echo ("
                                     + "icao_number,"
+                                    + "radar_site,"
                                     + "utcdetect,"
                                     + "amplitude,"
                                     + "radar_iid,"
@@ -946,8 +877,8 @@ public final class DataBlockParser extends Thread {
                                     + "verticalTrend,"
                                     + "onground"
                                     + ") VALUES ("
-                                    + "%d,"
                                     + "'%s',"
+                                    + "%d,"
                                     + "%d,"
                                     + "%d," // amplitude
                                     + "NULLIF(%d, -99), %d," // radariid & radarsi
@@ -956,8 +887,8 @@ public final class DataBlockParser extends Thread {
                                     + "%d,"
                                     + "%d,"
                                     + "%d)",
-                                    radar_site,
                                     icao_number,
+                                    radar_site,
                                     time,
                                     trk.getAmplitude(),
                                     trk.getRadarIID(),
@@ -977,98 +908,95 @@ public final class DataBlockParser extends Thread {
                     }
                 }
             }
-
+            
             /*
-                 * We now have all tracks to process callsigns
+             * We now process callsigns
              */
-            List<Track> all = getAllTracks();
+            for (Track trk : table) {
+                /*
+                 * Database might get closed
+                 * on exit or error, so kill thread
+                 */
+                if (EOF == true) {
+                    break;
+                }
 
-            if (all.isEmpty() == false) {
-                for (Track trk : all) {
-                    /*
-                         * Database might get closed
-                         * on exit or error, so kill thread
-                     */
-                    if (EOF == true) {
-                        break;
+                icao_number = trk.getAircraftICAO();
+                callsign = trk.getCallsign();
+                String registration = trk.getRegistration();
+
+                if (registration.equals("") == false) {
+
+                    queryString = String.format("SELECT count(*) AS RG FROM modes.icao_list"
+                            + " WHERE icao_number='%s'", icao_number);
+
+                    exists = 0;
+
+                    try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                        if (rs.next() == true) {
+                            exists = rs.getInt("RG");
+                        }
+                    } catch (SQLException e7) {
+                        System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e7.getMessage());
+                        continue;   // skip the following
                     }
 
-                    icao_number = trk.getAircraftICAO();
-                    callsign = trk.getCallsign();
-                    String registration = trk.getRegistration();
+                    if (exists > 0) {
+                        queryString = String.format("UPDATE modes.icao_list SET registration='%s' WHERE icao_number='%s'",
+                                registration,
+                                icao_number);
 
-                    if (registration.equals("") == false) {
+                        try (Statement query = db.createStatement()) {
+                            query.executeUpdate(queryString);
+                        } catch (SQLException e77) {
+                        }
+                    }
 
-                        queryString = String.format("SELECT count(*) AS RG FROM icao_list"
-                                + " WHERE icao_number='%s'", icao_number);
+                    /*
+                     * Does this track have a callsign?
+                     */
+                    if (callsign.equals("") == false) {     // false = has callsign
+                        queryString = String.format("SELECT count(*) AS CS FROM modes.callsign_list"
+                                + " WHERE callsign='%s' AND icao_number='%s'",
+                                callsign,
+                                icao_number);
 
                         exists = 0;
 
                         try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
                             if (rs.next() == true) {
-                                exists = rs.getInt("RG");
+                                exists = rs.getInt("CS");
                             }
-                        } catch (SQLException e7) {
-                            System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e7.getMessage());
-                            continue;   // skip the following
-                        }
-
-                        if (exists > 0) {
-                            queryString = String.format("UPDATE icao_list SET registration='%s' WHERE icao_number='%s'",
-                                    registration,
-                                    icao_number);
-
-                            try (Statement query = db.createStatement()) {
-                                query.executeUpdate(queryString);
-                            } catch (SQLException e77) {
-                            }
+                        } catch (SQLException e89) {
                         }
 
                         /*
-                         * Does this track have a callsign?
+                         * Does the callsign_list table have a copy of this callsign?
+                         * Not sure how useful this is, other than to show all the
+                         * callsigns used by an ICAO ID.
                          */
-                        if (callsign.equals("") == false) {     // false = has callsign
-                            queryString = String.format("SELECT count(*) AS CS FROM callsign_list"
-                                    + " WHERE callsign='%s' AND icao_number='%s'",
-                                    callsign,
-                                    icao_number);
+                        if (exists == 0) {
+                            // callsign not in table, so add it
+                            queryString = String.format("INSERT INTO modes.callsign_list (callsign, icao_number)"
+                                    + " VALUES ('%s', '%s')", callsign, icao_number);
 
-                            exists = 0;
-
-                            try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
-                                if (rs.next() == true) {
-                                    exists = rs.getInt("CS");
-                                }
-                            } catch (SQLException e89) {
-                            }
-
-                            /*
-                             * Does the callsign_list table have a copy of this callsign?
-                             * Not sure how useful this is, other than to show all the
-                             * callsigns used by an ICAO ID.
-                             */
-                            if (exists == 0) {
-                                // callsign not in table, so add it
-                                queryString = String.format("INSERT INTO callsign_list (callsign, icao_number)"
-                                        + " VALUES ('%s', '%s')", callsign, icao_number);
-
-                                try (Statement query = db.createStatement()) {
-                                    query.executeUpdate(queryString);
-                                } catch (SQLException e90) {
-                                    System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e90.getMessage());
-                                }
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e90) {
+                                System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e90.getMessage());
                             }
                         }
                     }
-                } // table empty
-
-                /*
-                 * Simulate radar RPM
-                 */
-                try {
-                    Thread.sleep(radarscan);
-                } catch (InterruptedException e9) {
                 }
+            }
+
+            /*
+             * Everything is copied to the database now
+             * Simulate radar RPM
+             */
+            try {
+                Thread.sleep(radarscan);
+            } catch (InterruptedException e9) {
             }
         }
     }
@@ -1137,7 +1065,7 @@ public final class DataBlockParser extends Thread {
                     icao_number = df04.getICAO();
 
                     try {
-                        if (hasTrack(icao_number)) {
+                        if (hasTrack(icao_number) == true) {
                             altitude = df04.getAltitude();
                             isOnGround = df04.getIsOnGround();
                             alert = df04.getIsAlert();
@@ -1169,7 +1097,7 @@ public final class DataBlockParser extends Thread {
                     icao_number = df05.getICAO();
 
                     try {
-                        if (hasTrack(icao_number)) {
+                        if (hasTrack(icao_number) == true) {
                             squawk = df05.getSquawk();
                             isOnGround = df05.getIsOnGround();
                             alert = df05.getIsAlert();
@@ -1211,7 +1139,6 @@ public final class DataBlockParser extends Thread {
                                  */
                                 Track t = new Track(icao_number, false);  // false == not TIS
                                 t.setRegistration(nconverter.icao_to_n(icao_number));
-                                t.setActive(true);
                                 addTrack(icao_number, t);
                             }
                         } catch (NullPointerException np) {
@@ -1323,7 +1250,6 @@ public final class DataBlockParser extends Thread {
                                  */
                                 Track t = new Track(icao_number, false);  // false == not TIS
                                 t.setRegistration(nconverter.icao_to_n(icao_number));
-                                t.setActive(true);
                                 addTrack(icao_number, t);
                             }
                         } catch (NullPointerException np) {
@@ -1443,7 +1369,6 @@ public final class DataBlockParser extends Thread {
                                  */
                                 Track t = new Track(icao_number, true);  // true == TIS
                                 t.setRegistration(nconverter.icao_to_n(icao_number));
-                                t.setActive(true);
                                 addTrack(icao_number, t);
                             }
                         } catch (NullPointerException np) {

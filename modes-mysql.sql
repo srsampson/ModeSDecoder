@@ -59,7 +59,7 @@ DROP TABLE IF EXISTS `position_echo`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `position_echo` (
   `position_id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'Position ID',
-  `radar_site` int unsigned NOT NULL DEFAULT '0' COMMENT 'Radar Site that generated this position report',
+  `radar_site` int unsigned DEFAULT NULL,
   `icao_number` char(6) NOT NULL COMMENT 'ICAO Number',
   `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC microseconds',
   `amplitude` int DEFAULT NULL COMMENT 'Receiver Amplitude',
@@ -116,8 +116,8 @@ DROP TABLE IF EXISTS `tracks`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `tracks` (
-  `track_id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT 'Track ID',
-  `radar_site` int unsigned NOT NULL DEFAULT '0' COMMENT 'Radar Site that generated this target report',
+  `track_id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `radar_site` int unsigned DEFAULT NULL COMMENT 'radar site',
   `icao_number` char(6) NOT NULL COMMENT 'ICAO Number',
   `utcdetect` bigint unsigned NOT NULL COMMENT 'UTC microseconds track first detected',
   `utcupdate` bigint unsigned NOT NULL COMMENT 'UTC microseconds track last updated',
@@ -196,4 +196,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2024-08-01  8:15:19
+-- Dump completed on 2024-08-02 20:54:09

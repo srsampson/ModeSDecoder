@@ -33,7 +33,7 @@ public final class PositionManager implements IConstants {
     //
     private final ZuluMillis zulu;
     private final CPR cpr;
-    private final DataBlockParser df;
+    private final DataBlockParser dbp;
     private final Timer timer1;
     private final TimerTask task1;
 
@@ -41,7 +41,7 @@ public final class PositionManager implements IConstants {
         pos = new ConcurrentHashMap<>();
         zulu = new ZuluMillis();
         cpr = new CPR();
-        df = d;
+        dbp = d;
         receiverLatLon = rxll;
 
         encodeCPR();
@@ -55,6 +55,9 @@ public final class PositionManager implements IConstants {
         timer1.cancel();
     }
 
+    /*
+     * In case receiver is moving
+    */
     public void updateReceiverPosition(LatLon rxll) {
         receiverLatLon = rxll;
 
@@ -189,11 +192,7 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
-                            if (df.hasTrack(icao)) {
-                                df.updateTrackLatLon(icao, latlon, mode, zulu);
-                            } else {
-                                df.createTrackLatLon(icao, tis, latlon, mode, zulu);
-                            }
+                            dbp.updateTrackLatLon(icao, latlon, mode, zulu);
                         }
                     } else if (time == 0L) {
                         /*
@@ -223,11 +222,7 @@ public final class PositionManager implements IConstants {
                         }
 
                         if (latlon.getLat() != 0.0f && latlon.getLon() != 0.0f) {
-                            if (df.hasTrack(icao)) {
-                                df.updateTrackLatLon(icao, latlon, mode, zulu);
-                            } else {
-                                df.createTrackLatLon(icao, tis, latlon, mode, zulu);
-                            }
+                            dbp.updateTrackLatLon(icao, latlon, mode, zulu);
                         }
                     }
 
