@@ -35,9 +35,3 @@ Apache NetBeans IDE 22
 Java: 22.0.1; OpenJDK 64-Bit Server VM 22.0.1+8-16   
 Runtime: OpenJDK Runtime Environment 22.0.1+8-16   
 System: Windows 11 version 10.0 running on amd64; UTF-8; en_US (nb)   
-
-#### Sample User Application
-With a database, you can then grab data and display it on a GUI.
-
-![Sample Display](radar.png)
-
