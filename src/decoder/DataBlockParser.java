@@ -1082,52 +1082,60 @@ public final class DataBlockParser extends Thread {
                     }
 
                     if (exists == 0) {
-                        queryString = String.format("INSERT INTO modes.altitude_list ("
-                                + "icao_number,"
-                                + "utcdetect,"
-                                + "radar_site,"
-                                + "altitude,"
-                                + "altitude_df00,"
-                                + "altitude_df04,"
-                                + "altitude_df16,"
-                                + "altitude_df17,"
-                                + "altitude_df18,"
-                                + "altitude_df20,"
-                                + "verticalRate,"
-                                + "verticalTrend,"
-                                + "onground"
-                                + ") VALUES ("
-                                + "'%s',"
-                                + "%d,"
-                                + "%d,"
-                                + "NULLIF(%d, -9999)," // alt
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999)," // vert rate
-                                + "%d,"
-                                + "%d)",
-                                icao_number,
-                                time,
-                                radar_site,
-                                trk.getAltitude(),
-                                trk.getAltitudeDF00(),
-                                trk.getAltitudeDF04(),
-                                trk.getAltitudeDF16(),
-                                trk.getAltitudeDF17(),
-                                trk.getAltitudeDF18(),
-                                trk.getAltitudeDF20(),
-                                trk.getVerticalRate(),
-                                trk.getVerticalTrend(),
-                                ground);
+                        /*
+                         * Don't load the database up with
+                         * a bunch of null crap.
+                         */
+                        int alt = trk.getAltitude();
+                        
+                        if (alt != -9999) {
+                            queryString = String.format("INSERT INTO modes.altitude_list ("
+                                    + "icao_number,"
+                                    + "utcdetect,"
+                                    + "radar_site,"
+                                    + "altitude,"
+                                    + "altitude_df00,"
+                                    + "altitude_df04,"
+                                    + "altitude_df16,"
+                                    + "altitude_df17,"
+                                    + "altitude_df18,"
+                                    + "altitude_df20,"
+                                    + "verticalRate,"
+                                    + "verticalTrend,"
+                                    + "onground"
+                                    + ") VALUES ("
+                                    + "'%s',"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "NULLIF(%d, -9999)," // alt
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999),"
+                                    + "NULLIF(%d, -9999)," // vert rate
+                                    + "%d,"
+                                    + "%d)",
+                                    icao_number,
+                                    time,
+                                    radar_site,
+                                    alt,
+                                    trk.getAltitudeDF00(),
+                                    trk.getAltitudeDF04(),
+                                    trk.getAltitudeDF16(),
+                                    trk.getAltitudeDF17(),
+                                    trk.getAltitudeDF18(),
+                                    trk.getAltitudeDF20(),
+                                    trk.getVerticalRate(),
+                                    trk.getVerticalTrend(),
+                                    ground);
 
-                        try (Statement query = db.createStatement()) {
-                            query.executeUpdate(queryString);
-                        } catch (SQLException e94) {
-                            System.out.println("DataBlockParser::run query altitude_list warn: " + queryString + " " + e94.getMessage());
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e94) {
+                                System.out.println("DataBlockParser::run query altitude_list warn: " + queryString + " " + e94.getMessage());
+                            }
                         }
                     }
                     
