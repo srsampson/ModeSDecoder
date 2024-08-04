@@ -11,6 +11,10 @@ The US registration (N-Number) are also added to the targets after the ICAO numb
 
 There are tables to store the velocities, altitudes, amplitudes, etc.
 
+You might pull some data to chart it, example:
+
+![Amplitudes](amp.png)
+
 #### Running the Application
 You must have MySQL installed. Currently version 9.0 is used for development. Import the ```.sql``` file to create the database, tables, and trigger.
 
