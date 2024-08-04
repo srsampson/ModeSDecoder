@@ -943,7 +943,33 @@ public final class DataBlockParser extends Thread {
                     /*
                      * We now process radar/si
                      */
-                    queryString = String.format("INSERT INTO modes.radar_list ("
+                    int iid = trk.getRadarIID();
+                    int sib = trk.getRadarSI() ? 1 : 0;
+
+                    queryString = String.format("SELECT count(*) AS RSK FROM modes.radar_list "
+                            + "WHERE icao_number='%s' "
+                            + "AND radar_site=%d "
+                            + "AND radar_iid=%d "
+                            + "AND radar_SI=%d "
+                            + "AND utcdetect=%d",
+                            icao_number,
+                            radar_site,
+                            iid,
+                            sib,
+                            time);
+
+                    exists = 0;
+
+                    try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                        if (rs.next() == true) {
+                            exists = rs.getInt("RSK");
+                        }
+                    } catch (SQLException e79) {
+                        System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e79.getMessage());
+                    }
+
+                    if (exists == 0) {
+                        queryString = String.format("INSERT INTO modes.radar_list ("
                             + "icao_number,"
                             + "utcdetect,"
                             + "radar_site,"
@@ -958,125 +984,199 @@ public final class DataBlockParser extends Thread {
                             icao_number,
                             time,
                             radar_site,
-                            trk.getRadarIID(),
-                            trk.getRadarSI() ? 1 : 0);
+                            iid,
+                            sib);
 
-                    try (Statement query = db.createStatement()) {
-                        query.executeUpdate(queryString);
-                    } catch (SQLException e92) {
-                        System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e92.getMessage());
+                        try (Statement query = db.createStatement()) {
+                            query.executeUpdate(queryString);
+                        } catch (SQLException e92) {
+                            System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e92.getMessage());
+                        }
+                    }
+
+                    /*
+                     * We now process speed/track
+                     *
+                     * Limit the rows to one per utcdetect
+                     */
+                    queryString = String.format("SELECT count(*) AS STS FROM modes.speed_list "
+                            + "WHERE icao_number='%s' "
+                            + "AND radar_site=%d "
+                            + "AND utcdetect=%d",
+                            icao_number,
+                            radar_site,
+                            time);
+
+                    exists = 0;
+
+                    try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                        if (rs.next() == true) {
+                            exists = rs.getInt("STS");
+                        }
+                    } catch (SQLException e799) {
+                        System.out.println("DataBlockParser::run query speed_list warn: " + queryString + " " + e799.getMessage());
+                    }
+
+                    if (exists == 0) {
+                        float spd = trk.getGroundSpeed();
+                        float gt = trk.getGroundTrack();
+                        float cspd = trk.getComputedGroundSpeed();
+                        float cgt = trk.getComputedGroundTrack();
+
+                        // If all these are null, skip the database write
+                        
+                        if ((spd != -999.0f) && (gt != -999.0f)) {
+                            queryString = String.format("INSERT INTO modes.speed_list ("
+                                    + "icao_number,"
+                                    + "utcdetect,"
+                                    + "radar_site,"
+                                    + "groundSpeed,"
+                                    + "groundTrack,"
+                                    + "gsComputed,"
+                                    + "gtComputed"
+                                    + ") VALUES ("
+                                    + "'%s',"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "NULLIF(%.1f, -999.0),"
+                                    + "NULLIF(%.1f, -999.0),"
+                                    + "NULLIF(%.1f, -999.0),"
+                                    + "NULLIF(%.1f, -999.0))",
+                                    icao_number,
+                                    time,
+                                    radar_site,
+                                    spd,
+                                    gt,
+                                    cspd,
+                                    cgt);
+
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e93) {
+                                System.out.println("DataBlockParser::run query speed_list warn: " + queryString + " " + e93.getMessage());
+                            }
+                        }
                     }
                     
                     /*
-                     * We now process speed/track
+                     * We now process altitude
+                     *
+                     * Limit the rows to one per utcdetect
                      */
-                    queryString = String.format("INSERT INTO modes.speed_list ("
-                            + "icao_number,"
-                            + "utcdetect,"
-                            + "radar_site,"
-                            + "groundSpeed,"
-                            + "groundTrack,"
-                            + "gsComputed,"
-                            + "gtComputed"
-                            + ") VALUES ("
-                            + "'%s',"
-                            + "%d,"
-                            + "%d,"
-                            + "NULLIF(%.1f, -999.0),"
-                            + "NULLIF(%.1f, -999.0),"
-                            + "NULLIF(%.1f, -999.0),"
-                            + "NULLIF(%.1f, -999.0))",
+                    queryString = String.format("SELECT count(*) AS ASK FROM modes.altitude_list "
+                            + "WHERE icao_number='%s' "
+                            + "AND radar_site=%d "
+                            + "AND utcdetect=%d",
                             icao_number,
-                            time,
                             radar_site,
-                            trk.getGroundSpeed(),
-                            trk.getGroundTrack(),
-                            trk.getComputedGroundSpeed(),
-                            trk.getComputedGroundTrack());
+                            time);
 
-                    try (Statement query = db.createStatement()) {
-                        query.executeUpdate(queryString);
-                    } catch (SQLException e93) {
-                        System.out.println("DataBlockParser::run query speed_list warn: " + queryString + " " + e93.getMessage());
+                    exists = 0;
+
+                    try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                        if (rs.next() == true) {
+                            exists = rs.getInt("ASK");
+                        }
+                    } catch (SQLException e788) {
+                        System.out.println("DataBlockParser::run query altitude_list warn: " + queryString + " " + e788.getMessage());
                     }
 
-                    /*
-                     * We now process altitude
-                     */
-                    queryString = String.format("INSERT INTO modes.altitude_list ("
-                            + "icao_number,"
-                            + "utcdetect,"
-                            + "radar_site,"
-                            + "altitude,"
-                            + "altitude_df00,"
-                            + "altitude_df04,"
-                            + "altitude_df16,"
-                            + "altitude_df17,"
-                            + "altitude_df18,"
-                            + "altitude_df20,"
-                            + "verticalRate,"
-                            + "verticalTrend,"
-                            + "onground"
-                            + ") VALUES ("
-                            + "'%s',"
-                            + "%d,"
-                            + "%d,"
-                            + "NULLIF(%d, -9999)," // alt
-                            + "NULLIF(%d, -9999),"
-                            + "NULLIF(%d, -9999),"
-                            + "NULLIF(%d, -9999),"
-                            + "NULLIF(%d, -9999),"
-                            + "NULLIF(%d, -9999),"
-                            + "NULLIF(%d, -9999),"
-                            + "NULLIF(%d, -9999)," // vert rate
-                            + "%d,"
-                            + "%d)",
-                            icao_number,
-                            time,
-                            radar_site,
-                            trk.getAltitude(),
-                            trk.getAltitudeDF00(),
-                            trk.getAltitudeDF04(),
-                            trk.getAltitudeDF16(),
-                            trk.getAltitudeDF17(),
-                            trk.getAltitudeDF18(),
-                            trk.getAltitudeDF20(),
-                            trk.getVerticalRate(),
-                            trk.getVerticalTrend(),
-                            ground);
+                    if (exists == 0) {
+                        queryString = String.format("INSERT INTO modes.altitude_list ("
+                                + "icao_number,"
+                                + "utcdetect,"
+                                + "radar_site,"
+                                + "altitude,"
+                                + "altitude_df00,"
+                                + "altitude_df04,"
+                                + "altitude_df16,"
+                                + "altitude_df17,"
+                                + "altitude_df18,"
+                                + "altitude_df20,"
+                                + "verticalRate,"
+                                + "verticalTrend,"
+                                + "onground"
+                                + ") VALUES ("
+                                + "'%s',"
+                                + "%d,"
+                                + "%d,"
+                                + "NULLIF(%d, -9999)," // alt
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999),"
+                                + "NULLIF(%d, -9999)," // vert rate
+                                + "%d,"
+                                + "%d)",
+                                icao_number,
+                                time,
+                                radar_site,
+                                trk.getAltitude(),
+                                trk.getAltitudeDF00(),
+                                trk.getAltitudeDF04(),
+                                trk.getAltitudeDF16(),
+                                trk.getAltitudeDF17(),
+                                trk.getAltitudeDF18(),
+                                trk.getAltitudeDF20(),
+                                trk.getVerticalRate(),
+                                trk.getVerticalTrend(),
+                                ground);
 
-                    try (Statement query = db.createStatement()) {
-                        query.executeUpdate(queryString);
-                    } catch (SQLException e94) {
-                        System.out.println("DataBlockParser::run query altitude_list warn: " + queryString + " " + e94.getMessage());
+                        try (Statement query = db.createStatement()) {
+                            query.executeUpdate(queryString);
+                        } catch (SQLException e94) {
+                            System.out.println("DataBlockParser::run query altitude_list warn: " + queryString + " " + e94.getMessage());
+                        }
                     }
                     
                     /*
                      * We now process amplitude
+                     *
+                     * Limit the rows to one per utcdetect
                      */
-                    amplitude = trk.getAmplitude();
-
-                    queryString = String.format("INSERT INTO modes.amplitude_list ("
-                            + "icao_number,"
-                            + "utcdetect,"
-                            + "radar_site,"
-                            + "amplitude"
-                            + ") VALUES ("
-                            + "'%s',"
-                            + "%d,"
-                            + "%d,"
-                            + "%d)",
+                    queryString = String.format("SELECT count(*) AS AMP FROM modes.amplitude_list "
+                            + "WHERE icao_number='%s' "
+                            + "AND radar_site=%d "
+                            + "AND utcdetect=%d",
                             icao_number,
-                            time,
                             radar_site,
-                            amplitude);
+                            time);
 
-                    try (Statement query = db.createStatement()) {
-                        query.executeUpdate(queryString);
-                    } catch (SQLException e91) {
-                        System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e91.getMessage());
+                    exists = 0;
+
+                    try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                        if (rs.next() == true) {
+                            exists = rs.getInt("AMP");
+                        }
+                    } catch (SQLException e789) {
+                        System.out.println("DataBlockParser::run query amplitude_list warn: " + queryString + " " + e789.getMessage());
                     }
 
+                    if (exists == 0) {
+                        queryString = String.format("INSERT INTO modes.amplitude_list ("
+                                + "icao_number,"
+                                + "utcdetect,"
+                                + "radar_site,"
+                                + "amplitude"
+                                + ") VALUES ("
+                                + "'%s',"
+                                + "%d,"
+                                + "%d,"
+                                + "%d)",
+                                icao_number,
+                                time,
+                                radar_site,
+                                trk.getAmplitude());
+
+                        try (Statement query = db.createStatement()) {
+                            query.executeUpdate(queryString);
+                        } catch (SQLException e91) {
+                            System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e91.getMessage());
+                        }
+                    }
+                    
                     /*
                      * Database might get closed
                      * on exit or error, so kill thread
