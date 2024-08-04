@@ -52,9 +52,6 @@ public final class Track implements IConstants {
     private boolean isVirtOnGround; // Virtual onGround for MMS2
     private boolean hijack;
     private boolean comm_out;
-    private boolean hadAlert;
-    private boolean hadEmergency;
-    private boolean hadSPI;
     private boolean updated;        // set on update, cleared on sent
     private boolean updatePosition;
     private boolean isLocal;            // Track is from one of our radars/not remote
@@ -103,8 +100,7 @@ public final class Track implements IConstants {
         updatedPositionTime = 0L;
         updatedTime = 0L;
         //
-        alert = emergency = spi = hadAlert
-                = hadEmergency = hadSPI = si = hijack = comm_out = false;
+        alert = emergency = spi = si = hijack = comm_out = false;
         updated = updatePosition = false;
         isOnGround = isVirtOnGround = false;
     }
@@ -778,11 +774,6 @@ public final class Track implements IConstants {
             }
 
             alert = val1;
-
-            if (alert == true) {
-                hadAlert = true;
-            }
-
             changed = true;
         }
 
@@ -794,11 +785,6 @@ public final class Track implements IConstants {
             }
 
             emergency = val2;
-
-            if (emergency == true) {
-                hadEmergency = true;
-            }
-
             changed = true;
         }
 
@@ -810,29 +796,12 @@ public final class Track implements IConstants {
             }
 
             spi = val3;
-
-            if (spi == true) {
-                hadSPI = true;
-            }
-
             changed = true;
         }
 
         if (changed == true) {
             updated = true;
         }
-    }
-
-    public boolean getHadAlert() {
-        return hadAlert;
-    }
-
-    public boolean getHadEmergency() {
-        return hadEmergency;
-    }
-
-    public boolean getHadSPI() {
-        return hadSPI;
     }
 
     public int getMode() {

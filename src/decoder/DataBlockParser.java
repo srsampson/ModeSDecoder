@@ -614,6 +614,7 @@ public final class DataBlockParser extends Thread {
     @Override
     public void run() {
         String queryString;
+        String registration;
         int ground, exists;
         long time;
 
@@ -665,10 +666,10 @@ public final class DataBlockParser extends Thread {
 
             if (table.isEmpty() == false) {
                 for (Track trk : table) {
-                    time = trk.getUpdatedTime();
                     trk.setUpdated(false);  // reset the updated boolean
 
                     icao_number = trk.getAircraftICAO();
+                    time = trk.getUpdatedTime();
 
                     /*
                      * See if this ICAO exists yet in the track table, and
@@ -693,71 +694,17 @@ public final class DataBlockParser extends Thread {
                         ground = 0;
                     }
 
+                    /*
+                     * Not much in tracks anymore
+                     */
                     if (exists > 0) {         // track exists
-                        queryString = String.format("UPDATE modes.tracks SET utcupdate=%d,"
-                                + "amplitude=%d,"
-                                + "radar_iid=NULLIF(%d, -99),"
-                                + "radar_si=%d,"
-                                + "altitude=NULLIF(%d, -9999),"
-                                + "altitudedf00=NULLIF(%d, -9999),"
-                                + "altitudedf04=NULLIF(%d, -9999),"
-                                + "altitudedf16=NULLIF(%d, -9999),"
-                                + "altitudedf17=NULLIF(%d, -9999),"
-                                + "altitudedf18=NULLIF(%d, -9999),"
-                                + "altitudedf20=NULLIF(%d, -9999),"
-                                + "groundSpeed=NULLIF(%.1f, -999.0),"
-                                + "groundTrack=NULLIF(%.1f, -999.0),"
-                                + "gsComputed=NULLIF(%.1f, -999.0),"
-                                + "gtComputed=NULLIF(%.1f, -999.0),"
-                                + "callsign='%s',"
-                                + "latitude=NULLIF(%f, -999.0),"
-                                + "longitude=NULLIF(%f, -999.0),"
-                                + "verticalRate=NULLIF(%d, -9999),"
-                                + "verticalTrend=%d,"
+                        queryString = String.format("UPDATE modes.tracks SET "
+                                + "utcupdate=%d,"
                                 + "quality=%d,"
-                                + "squawk='%s',"
-                                + "alert=%d,"
-                                + "emergency=%d,"
-                                + "spi=%d,"
-                                + "onground=%d,"
-                                + "hijack=%d,"
-                                + "comm_out=%d,"
-                                + "hadAlert=%d,"
-                                + "hadEmergency=%d,"
-                                + "hadSPI=%d,"
                                 + "active='1'"
                                 + " WHERE icao_number='%s' AND radar_site=%d",
                                 time,
-                                trk.getAmplitude(),
-                                trk.getRadarIID(),
-                                trk.getRadarSI() ? 1 : 0,
-                                trk.getAltitude(),
-                                trk.getAltitudeDF00(),
-                                trk.getAltitudeDF04(),
-                                trk.getAltitudeDF16(),
-                                trk.getAltitudeDF17(),
-                                trk.getAltitudeDF18(),
-                                trk.getAltitudeDF20(),
-                                trk.getGroundSpeed(),
-                                trk.getGroundTrack(),
-                                trk.getComputedGroundSpeed(),
-                                trk.getComputedGroundTrack(),
-                                trk.getCallsign(),
-                                trk.getLatitude(),
-                                trk.getLongitude(),
-                                trk.getVerticalRate(),
-                                trk.getVerticalTrend(),
                                 trk.getTrackQuality(),
-                                trk.getSquawk(),
-                                trk.getAlert() ? 1 : 0,
-                                trk.getEmergency() ? 1 : 0,
-                                trk.getSPI() ? 1 : 0,
-                                ground,
-                                trk.getHijack() ? 1 : 0,
-                                trk.getCommOut() ? 1 : 0,
-                                trk.getHadAlert() ? 1 : 0,
-                                trk.getHadEmergency() ? 1 : 0,
-                                trk.getHadSPI() ? 1 : 0,
                                 icao_number,
                                 radar_site);
                     } else {                // track doesn't exist
@@ -766,93 +713,14 @@ public final class DataBlockParser extends Thread {
                                 + "radar_site,"
                                 + "utcdetect,"
                                 + "utcupdate,"
-                                + "amplitude,"
-                                + "radar_iid,"
-                                + "radar_si,"
-                                + "altitude,"
-                                + "altitudedf00,"
-                                + "altitudedf04,"
-                                + "altitudedf16,"
-                                + "altitudedf17,"
-                                + "altitudedf18,"
-                                + "altitudedf20,"
-                                + "groundSpeed,"
-                                + "groundTrack,"
-                                + "gsComputed,"
-                                + "gtComputed,"
-                                + "callsign,"
-                                + "latitude,"
-                                + "longitude,"
-                                + "verticalRate,"
-                                + "verticalTrend,"
                                 + "quality,"
-                                + "squawk,"
-                                + "alert,"
-                                + "emergency,"
-                                + "spi,"
-                                + "onground,"
-                                + "hijack,"
-                                + "comm_out,"
-                                + "hadAlert,"
-                                + "hadEmergency,"
-                                + "hadSPI,"
-                                + "active) "
-                                + "VALUES ('%s',%d,"
-                                + "%d,%d,%d,"
-                                + "NULLIF(%d, -99), %d," // radarIID & SI
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%d, -9999),"
-                                + "NULLIF(%.1f,-999.0),"
-                                + "NULLIF(%.1f,-999.0),"
-                                + "NULLIF(%.1f,-999.0),"
-                                + "NULLIF(%.1f,-999.0),"
-                                + "'%s',"
-                                + "NULLIF(%f, -999.0),"
-                                + "NULLIF(%f, -999.0),"
-                                + "NULLIF(%d, -9999),"
-                                + "%d,"
-                                + "%d,"
-                                + "'%s',"
-                                + "%d,%d,%d,%d,%d,%d,%d,%d,%d,'1')",
+                                + "active"
+                                + ") VALUES ('%s',%d,%d,%d,%d,'1')",
                                 icao_number,
                                 radar_site,
                                 time,
                                 time,
-                                trk.getAmplitude(),
-                                trk.getRadarIID(),
-                                trk.getRadarSI() ? 1 : 0,
-                                trk.getAltitude(),
-                                trk.getAltitudeDF00(),
-                                trk.getAltitudeDF04(),
-                                trk.getAltitudeDF16(),
-                                trk.getAltitudeDF17(),
-                                trk.getAltitudeDF18(),
-                                trk.getAltitudeDF20(),
-                                trk.getGroundSpeed(),
-                                trk.getGroundTrack(),
-                                trk.getComputedGroundSpeed(),
-                                trk.getComputedGroundTrack(),
-                                trk.getCallsign(),
-                                trk.getLatitude(),
-                                trk.getLongitude(),
-                                trk.getVerticalRate(),
-                                trk.getVerticalTrend(),
-                                trk.getTrackQuality(),
-                                trk.getSquawk(),
-                                trk.getAlert() ? 1 : 0,
-                                trk.getEmergency() ? 1 : 0,
-                                trk.getSPI() ? 1 : 0,
-                                ground,
-                                trk.getHijack() ? 1 : 0,
-                                trk.getCommOut() ? 1 : 0,
-                                trk.getHadAlert() ? 1 : 0,
-                                trk.getHadEmergency() ? 1 : 0,
-                                trk.getHadSPI() ? 1 : 0);
+                                trk.getTrackQuality());
                     }
 
                     try (Statement query = db.createStatement()) {
@@ -864,41 +732,24 @@ public final class DataBlockParser extends Thread {
                     if (trk.getUpdatePosition() == true) {
                         trk.setUpdatePosition(false);
 
-                        // Safety check, we don't want NULL's
-                        // TODO: Figure out why we get those
                         if ((trk.getLatitude() != -999.0F) && (trk.getLongitude() != -999.0F)) {
                             queryString = String.format("INSERT INTO modes.position_echo ("
                                     + "icao_number,"
                                     + "radar_site,"
                                     + "utcdetect,"
-                                    + "amplitude,"
-                                    + "radar_iid,"
-                                    + "radar_si,"
                                     + "latitude,"
                                     + "longitude,"
-                                    + "altitude,"
                                     + "verticalTrend,"
                                     + "onground"
-                                    + ") VALUES ("
-                                    + "'%s',"
-                                    + "%d,"
-                                    + "%d,"
-                                    + "%d," // amplitude
-                                    + "NULLIF(%d, -99), %d," // radariid & radarsi
-                                    + "%f,"
-                                    + "%f,"
-                                    + "%d,"
-                                    + "%d,"
-                                    + "%d)",
+                                    + ") VALUES ('%s',%d,%d,"
+                                    + "NULLIF(%f, -999.0),"
+                                    + "NULLIF(%f, -999.0),"
+                                    + "%d, %d)",
                                     icao_number,
                                     radar_site,
                                     time,
-                                    trk.getAmplitude(),
-                                    trk.getRadarIID(),
-                                    trk.getRadarSI() ? 1 : 0,
                                     trk.getLatitude(),
                                     trk.getLongitude(),
-                                    trk.getAltitude(),
                                     trk.getVerticalTrend(),
                                     ground);
 
@@ -909,55 +760,150 @@ public final class DataBlockParser extends Thread {
                             }
                         }
                     }
-                }
-            }
-            
-            /*
-             * We now process callsigns
-             */
-            for (Track trk : table) {
-                /*
-                 * Database might get closed
-                 * on exit or error, so kill thread
-                 */
-                if (EOF == true) {
-                    break;
-                }
 
-                icao_number = trk.getAircraftICAO();
-                callsign = trk.getCallsign();
-                String registration = trk.getRegistration();
+                    /*
+                     * We now process squawks
+                     *
+                     * First see if squawk is null, and skip if it is.
+                     *
+                     * See if this ICAO exists yet in the squawk table, and
+                     * only if the squawk is new, drop it in.
+                     */
+                    squawk = trk.getSquawk();
 
-                if (registration.equals("") == false) {
+                    if (squawk.equals("") == false) {
+                        queryString = String.format("SELECT count(*) AS SK"
+                                + " FROM modes.squawk_list "
+                                + "WHERE icao_number='%s' AND squawk='%s'",
+                                icao_number, squawk);
 
-                    queryString = String.format("SELECT count(*) AS RG FROM modes.icao_list"
-                            + " WHERE icao_number='%s'", icao_number);
+                        exists = 0;
+
+                        try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                            if (rs.next() == true) {
+                                exists = rs.getInt("SK");
+                            }
+                        } catch (SQLException e3) {
+                        }
+
+                        if (exists == 0) {
+                            queryString = String.format("INSERT INTO modes.squawk_list ("
+                                    + "icao_number,"
+                                    + "utcdetect,"
+                                    + "squawk) VALUES ('%s',%d,'%s')",
+                                    icao_number,
+                                    time,
+                                    squawk);
+
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e67) {
+                                System.out.println("DataBlockParser::run query squawk Error: " + queryString + " " + e67.getMessage());
+                            }
+                        }
+                    }
+                    
+                    /*
+                     * We now process alerts
+                     * Check for duplicates
+                     */
+                    queryString = String.format("SELECT count(*) AS AK FROM modes.alert_list "
+                            + "WHERE icao_number='%s' AND utcdetect=%d",
+                            icao_number,
+                            time);
 
                     exists = 0;
 
                     try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
                         if (rs.next() == true) {
-                            exists = rs.getInt("RG");
+                            exists = rs.getInt("AK");
                         }
-                    } catch (SQLException e7) {
-                        System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e7.getMessage());
-                        continue;   // skip the following
+                    } catch (SQLException e77) {
+                        System.out.println("DataBlockParser::run query alert_list warn: " + queryString + " " + e77.getMessage());
                     }
 
-                    if (exists > 0) {
-                        queryString = String.format("UPDATE modes.icao_list SET registration='%s' WHERE icao_number='%s'",
-                                registration,
-                                icao_number);
+                    if (exists == 0) {
+                        boolean aa = trk.getAlert();
+                        boolean ea = trk.getEmergency();
+                        boolean sa = trk.getSPI();
+                        boolean ja = trk.getHijack();
+                        boolean ca = trk.getCommOut();
 
-                        try (Statement query = db.createStatement()) {
-                            query.executeUpdate(queryString);
-                        } catch (SQLException e77) {
+                        if (aa == true || ea == true || sa == true || ja == true || ca == true) {
+                            queryString = String.format("INSERT INTO modes.alert_list ("
+                                    + "icao_number,"
+                                    + "utcdetect,"
+                                    + "alert,"
+                                    + "emergency,"
+                                    + "spi,"
+                                    + "hijack,"
+                                    + "comm_out"
+                                    + ") VALUES ("
+                                    + "'%s',"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "%d)",
+                                    icao_number,
+                                    time,
+                                    (aa == true) ? 1 : 0,
+                                    (ea == true) ? 1 : 0,
+                                    (sa == true) ? 1 : 0,
+                                    (ja == true) ? 1 : 0,
+                                    (ca == true) ? 1 : 0);
+
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e66) {
+                                System.out.println("DataBlockParser::run query alert Error: " + queryString + " " + e66.getMessage());
+                            }
                         }
                     }
 
                     /*
-                     * Does this track have a callsign?
+                     * We now process registrations
+                     * Check for duplicates
                      */
+                    registration = trk.getRegistration();
+
+                    if (registration.equals("") == false) {
+                        queryString = String.format("SELECT count(*) AS RG FROM modes.icao_list "
+                                + "WHERE icao_number='%s' AND registration='%s'",
+                                icao_number,
+                                registration);
+
+                        exists = 0;
+
+                        try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                            if (rs.next() == true) {
+                                exists = rs.getInt("RG");
+                            }
+                        } catch (SQLException e7) {
+                            System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e7.getMessage());
+                        }
+
+                        if (exists == 0) {
+                            queryString = String.format("UPDATE modes.icao_list SET "
+                                    + "registration = '%s' WHERE icao_number = '%s'",
+                                registration,
+                                icao_number);
+
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e77) {
+                                System.out.println("DataBlockParser::run query icao_list warn: " + queryString + " " + e77.getMessage());
+                            }
+                        }
+                    }
+
+                    /*
+                     * We now process callsigns
+                     * Check for duplicates
+                     */
+                    callsign = trk.getCallsign();
+
                     if (callsign.equals("") == false) {     // false = has callsign
                         queryString = String.format("SELECT count(*) AS CS FROM modes.callsign_list"
                                 + " WHERE callsign='%s' AND icao_number='%s'",
@@ -973,15 +919,18 @@ public final class DataBlockParser extends Thread {
                         } catch (SQLException e89) {
                         }
 
-                        /*
-                         * Does the callsign_list table have a copy of this callsign?
-                         * Not sure how useful this is, other than to show all the
-                         * callsigns used by an ICAO ID.
-                         */
                         if (exists == 0) {
-                            // callsign not in table, so add it
-                            queryString = String.format("INSERT INTO modes.callsign_list (callsign, icao_number)"
-                                    + " VALUES ('%s', '%s')", callsign, icao_number);
+                            queryString = String.format("INSERT INTO modes.callsign_list ("
+                                    + "callsign,"
+                                    + "icao_number,"
+                                    + "utcdetect"
+                                    + ") VALUES ("
+                                    + "'%s',"
+                                    + "'%s',"
+                                    + "%d)",
+                                    callsign,
+                                    icao_number,
+                                    time);
 
                             try (Statement query = db.createStatement()) {
                                 query.executeUpdate(queryString);
@@ -990,8 +939,153 @@ public final class DataBlockParser extends Thread {
                             }
                         }
                     }
-                }
-            }
+
+                    /*
+                     * We now process radar/si
+                     */
+                    queryString = String.format("INSERT INTO modes.radar_list ("
+                            + "icao_number,"
+                            + "utcdetect,"
+                            + "radar_site,"
+                            + "radar_iid,"
+                            + "radar_si"
+                            + ") VALUES ("
+                            + "'%s',"
+                            + "%d,"
+                            + "%d,"
+                            + "NULLIF(%d, -99),"
+                            + "%d)",
+                            icao_number,
+                            time,
+                            radar_site,
+                            trk.getRadarIID(),
+                            trk.getRadarSI() ? 1 : 0);
+
+                    try (Statement query = db.createStatement()) {
+                        query.executeUpdate(queryString);
+                    } catch (SQLException e92) {
+                        System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e92.getMessage());
+                    }
+                    
+                    /*
+                     * We now process speed/track
+                     */
+                    queryString = String.format("INSERT INTO modes.speed_list ("
+                            + "icao_number,"
+                            + "utcdetect,"
+                            + "radar_site,"
+                            + "groundSpeed,"
+                            + "groundTrack,"
+                            + "gsComputed,"
+                            + "gtComputed"
+                            + ") VALUES ("
+                            + "'%s',"
+                            + "%d,"
+                            + "%d,"
+                            + "NULLIF(%.1f, -999.0),"
+                            + "NULLIF(%.1f, -999.0),"
+                            + "NULLIF(%.1f, -999.0),"
+                            + "NULLIF(%.1f, -999.0))",
+                            icao_number,
+                            time,
+                            radar_site,
+                            trk.getGroundSpeed(),
+                            trk.getGroundTrack(),
+                            trk.getComputedGroundSpeed(),
+                            trk.getComputedGroundTrack());
+
+                    try (Statement query = db.createStatement()) {
+                        query.executeUpdate(queryString);
+                    } catch (SQLException e93) {
+                        System.out.println("DataBlockParser::run query speed_list warn: " + queryString + " " + e93.getMessage());
+                    }
+
+                    /*
+                     * We now process altitude
+                     */
+                    queryString = String.format("INSERT INTO modes.altitude_list ("
+                            + "icao_number,"
+                            + "utcdetect,"
+                            + "radar_site,"
+                            + "altitude,"
+                            + "altitude_df00,"
+                            + "altitude_df04,"
+                            + "altitude_df16,"
+                            + "altitude_df17,"
+                            + "altitude_df18,"
+                            + "altitude_df20,"
+                            + "verticalRate,"
+                            + "verticalTrend,"
+                            + "onground"
+                            + ") VALUES ("
+                            + "'%s',"
+                            + "%d,"
+                            + "%d,"
+                            + "NULLIF(%d, -9999)," // alt
+                            + "NULLIF(%d, -9999),"
+                            + "NULLIF(%d, -9999),"
+                            + "NULLIF(%d, -9999),"
+                            + "NULLIF(%d, -9999),"
+                            + "NULLIF(%d, -9999),"
+                            + "NULLIF(%d, -9999),"
+                            + "NULLIF(%d, -9999)," // vert rate
+                            + "%d,"
+                            + "%d)",
+                            icao_number,
+                            time,
+                            radar_site,
+                            trk.getAltitude(),
+                            trk.getAltitudeDF00(),
+                            trk.getAltitudeDF04(),
+                            trk.getAltitudeDF16(),
+                            trk.getAltitudeDF17(),
+                            trk.getAltitudeDF18(),
+                            trk.getAltitudeDF20(),
+                            trk.getVerticalRate(),
+                            trk.getVerticalTrend(),
+                            ground);
+
+                    try (Statement query = db.createStatement()) {
+                        query.executeUpdate(queryString);
+                    } catch (SQLException e94) {
+                        System.out.println("DataBlockParser::run query altitude_list warn: " + queryString + " " + e94.getMessage());
+                    }
+                    
+                    /*
+                     * We now process amplitude
+                     */
+                    amplitude = trk.getAmplitude();
+
+                    queryString = String.format("INSERT INTO modes.amplitude_list ("
+                            + "icao_number,"
+                            + "utcdetect,"
+                            + "radar_site,"
+                            + "amplitude"
+                            + ") VALUES ("
+                            + "'%s',"
+                            + "%d,"
+                            + "%d,"
+                            + "%d)",
+                            icao_number,
+                            time,
+                            radar_site,
+                            amplitude);
+
+                    try (Statement query = db.createStatement()) {
+                        query.executeUpdate(queryString);
+                    } catch (SQLException e91) {
+                        System.out.println("DataBlockParser::run query callsign_list warn: " + queryString + " " + e91.getMessage());
+                    }
+
+                    /*
+                     * Database might get closed
+                     * on exit or error, so kill thread
+                     */
+                    if (EOF == true) {
+                        break;
+                    }
+                } // for loop
+            } // if empty
 
             /*
              * Everything is copied to the database now
@@ -1001,7 +1095,7 @@ public final class DataBlockParser extends Thread {
                 Thread.sleep(radarscan);
             } catch (InterruptedException e9) {
             }
-        }
+        } // while
     }
 
     private void parseShortDetects() {
@@ -1051,7 +1145,7 @@ public final class DataBlockParser extends Thread {
                         /*
                          * Not likely to occur
                          */
-                        System.err.println(np);
+                        System.err.println(np.getMessage());
                     }
                     break;
                 case 4:
@@ -1083,7 +1177,7 @@ public final class DataBlockParser extends Thread {
                         /*
                          * Not likely to occur
                          */
-                        System.err.println(np);
+                        System.err.println(np.getMessage());
                     }
                     break;
                 case 5:
@@ -1115,7 +1209,7 @@ public final class DataBlockParser extends Thread {
                         /*
                          * Not likely to occur
                          */
-                        System.err.println(np);
+                        System.err.println(np.getMessage());
                     }
                     break;
                 case 11:
@@ -1148,7 +1242,7 @@ public final class DataBlockParser extends Thread {
                             /*
                              * Not likely to occur
                              */
-                            System.err.println(np);
+                            System.err.println(np.getMessage());
                             break;
                         }
 
@@ -1226,7 +1320,7 @@ public final class DataBlockParser extends Thread {
                         /*
                          * Not likely to occur
                          */
-                        System.err.println(np);
+                        System.err.println(np.getMessage());
                     }
                     break;
                 case 17:
@@ -1259,7 +1353,7 @@ public final class DataBlockParser extends Thread {
                             /*
                              * Not likely to occur
                              */
-                            System.err.println(np);
+                            System.err.println(np.getMessage());
                             break;
                         }
 
@@ -1378,7 +1472,7 @@ public final class DataBlockParser extends Thread {
                             /*
                              * Not likely to occur
                              */
-                            System.err.println(np);
+                            System.err.println(np.getMessage());
                         }
 
                         updateTrackAmplitude(icao_number, amplitude, detectTime);
@@ -1512,7 +1606,7 @@ public final class DataBlockParser extends Thread {
                         /*
                          * Not likely to occur
                          */
-                        System.err.println(np);
+                        System.err.println(np.getMessage());
                     }
                     break;
                 case 21:
@@ -1562,7 +1656,7 @@ public final class DataBlockParser extends Thread {
                         /*
                          * Not likely to occur
                          */
-                        System.err.println(np);
+                        System.err.println(np.getMessage());
                     }
                     break;
                 default:    // output CSV
