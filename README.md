@@ -9,7 +9,7 @@ When new tracks are detected, their Mode-S ICAO number is added to the ```icao_l
 
 The US registration (N-Number) are also added to the targets after the ICAO number is received. These are assigned 1:1 in the US. No other countries are decoded.
 
-There are tables to store the velocities, altitudes, amplitudes, etc.
+There are tables to store the velocities, altitudes, amplitudes, etc. These tables are updated each time the internal tracks are updated.
 
 You might pull some data to chart it, example:
 
