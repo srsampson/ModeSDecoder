@@ -951,51 +951,56 @@ public final class DataBlockParser extends Thread {
                     int iid = trk.getRadarIID();
                     int sib = trk.getRadarSI() ? 1 : 0;
 
-                    queryString = String.format("SELECT count(*) AS RSK FROM modes.radar_list "
-                            + "WHERE icao_number='%s' "
-                            + "AND radar_site=%d "
-                            + "AND radar_iid=%d "
-                            + "AND radar_SI=%d "
-                            + "AND utcdetect=%d",
-                            icao_number,
-                            radar_site,
-                            iid,
-                            sib,
-                            time);
+                    /*
+                     * Don't fill database up with NULL's
+                     */
+                    if (iid != -99) {
+                        queryString = String.format("SELECT count(*) AS RSK FROM modes.radar_list "
+                                + "WHERE icao_number='%s' "
+                                + "AND radar_site=%d "
+                                + "AND radar_iid=%d "
+                                + "AND radar_SI=%d "
+                                + "AND utcdetect=%d",
+                                icao_number,
+                                radar_site,
+                                iid,
+                                sib,
+                                time);
 
-                    exists = 0;
+                        exists = 0;
 
-                    try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
-                        if (rs.next() == true) {
-                            exists = rs.getInt("RSK");
+                        try (Statement query = db.createStatement(); ResultSet rs = query.executeQuery(queryString)) {
+                            if (rs.next() == true) {
+                                exists = rs.getInt("RSK");
+                            }
+                        } catch (SQLException e79) {
+                            System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e79.getMessage());
                         }
-                    } catch (SQLException e79) {
-                        System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e79.getMessage());
-                    }
 
-                    if (exists == 0) {
-                        queryString = String.format("INSERT INTO modes.radar_list ("
-                            + "icao_number,"
-                            + "utcdetect,"
-                            + "radar_site,"
-                            + "radar_iid,"
-                            + "radar_si"
-                            + ") VALUES ("
-                            + "'%s',"
-                            + "%d,"
-                            + "%d,"
-                            + "NULLIF(%d, -99),"
-                            + "%d)",
-                            icao_number,
-                            time,
-                            radar_site,
-                            iid,
-                            sib);
+                        if (exists == 0) {
+                            queryString = String.format("INSERT INTO modes.radar_list ("
+                                    + "icao_number,"
+                                    + "utcdetect,"
+                                    + "radar_site,"
+                                    + "radar_iid,"
+                                    + "radar_si"
+                                    + ") VALUES ("
+                                    + "'%s',"
+                                    + "%d,"
+                                    + "%d,"
+                                    + "NULLIF(%d, -99),"
+                                    + "%d)",
+                                    icao_number,
+                                    time,
+                                    radar_site,
+                                    iid,
+                                    sib);
 
-                        try (Statement query = db.createStatement()) {
-                            query.executeUpdate(queryString);
-                        } catch (SQLException e92) {
-                            System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e92.getMessage());
+                            try (Statement query = db.createStatement()) {
+                                query.executeUpdate(queryString);
+                            } catch (SQLException e92) {
+                                System.out.println("DataBlockParser::run query radar_list warn: " + queryString + " " + e92.getMessage());
+                            }
                         }
                     }
 
@@ -1028,9 +1033,23 @@ public final class DataBlockParser extends Thread {
                         float cspd = trk.getComputedGroundSpeed();
                         float cgt = trk.getComputedGroundTrack();
 
-                        // If all these are null, skip the database write
+                        /*
+                         * If no speed transmitted (null), skip the database write
+                         * unless computed values are available
+                         */
+                        boolean skip = false;
                         
-                        if ((spd != -999.0f) && (gt != -999.0f)) {
+                        if ((spd == -999.0f) && (gt == -999.0f)) {
+                            if ((cspd == -999.0f) && (cgt == -999.0f)) {
+                                skip = true;
+                            }
+                        }
+
+                        if (skip == false) {
+                            if ((cspd == -999.0f) && (cgt == -999.0f)) {
+                                cspd = cgt = 0.0f;   // write 0 rather than null
+                            }
+
                             queryString = String.format("INSERT INTO modes.speed_list ("
                                     + "icao_number,"
                                     + "utcdetect,"
