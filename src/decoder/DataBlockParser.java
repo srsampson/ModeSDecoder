@@ -39,45 +39,17 @@ public final class DataBlockParser extends Thread {
     private final NConverter nconverter;
     private final ZuluMillis zulu;
     private final PressureAltitude pa;
-    private DataBlock dbk;
     //
     private final Connection db;
     private final Config config;
     //
-    
     private final int radar_site;
     private final long trackTimeout;
     private final long radarscan;
     //
     private static boolean EOF;
-    private String data;
-    private String icao_number;
-    private String callsign;
-    private String squawk;
-    private String mdhash;
-    private String airport;
-    //
-    private boolean isOnGround;
-    private boolean emergency;
-    private boolean alert;
-    private boolean spi;
-    private boolean si;
-    //
-    private long data56;
-    private long detectTime;
-    //
-    private float groundSpeed;
-    private float trueHeading;
-    private float magneticHeading;
-    private float airspeed;
-    //
-    private int vSpeed;
-    private int category;
-    private int subtype3;
-    private int altitude;
-    private int radarIID;
-    private int amplitude;
-    private int elevation;
+    private final String airport;
+    private final int elevation;
     //
     private final Timer timer1;
     private final Timer timer2;
@@ -95,21 +67,14 @@ public final class DataBlockParser extends Thread {
 
         radarscan = (long) cf.getRadarScanTime() * 1000L;
         radar_site = cf.getRadarSite();
-
+        
         if (pa == null) {
             airport = "";
             elevation = 0;
         } else {
             airport = pa.getAirportName();            
             elevation = pa.getAirportElevation();
-        }
-
-        icao_number = "";
-        callsign = "";
-        squawk = "";
-        mdhash = "";      
-        airport = "";   // TODO Add to table
-        elevation = 0;
+        }      
 
         tracks = new ConcurrentHashMap<>();
         shortDetects = new ConcurrentHashMap<>();
@@ -293,7 +258,7 @@ public final class DataBlockParser extends Thread {
                     + "NULLIF(%.1f,-999.0),"
                     + "NULLIF(%.1f,-999.0),"
                     + "%d,%d,%d,%d,%d,%d,'%s','%s')",
-                    icao_number,
+                    hexid,
                     tcas.getDetectTime(),
                     tcas.getDFSource(),
                     tcas.getThreatTypeIndicator(),
@@ -618,10 +583,13 @@ public final class DataBlockParser extends Thread {
      */
     @Override
     public void run() {
+        DataBlock block;
         String queryString;
-        String registration;
+        String mdhash;
+        String icao_number;
         boolean updated;
-        int ground, exists;
+        int ground;
+        int exists;
         long time;
 
         while (EOF == false) {
@@ -641,22 +609,18 @@ public final class DataBlockParser extends Thread {
 
             for (int i = 0; i < qsize; i++) {
                 try {
-                    dbk = buf.popData();
-
-                    amplitude = dbk.getSignalLevel();
-                    data = dbk.getData();
-                    detectTime = dbk.getUTCTime();
-                    mdhash = dbk.getDataHash();
-
-                    if (dbk.getBlockType() == DataBlock.SHORTBLOCK) {
+                    block = buf.popData();
+                    mdhash = block.getDataHash();
+                    
+                    if (block.getBlockType() == DataBlock.SHORTBLOCK) {
                         /*
                          * This will put the short data blocks on the keyed queue
                          * and duplicates will be overwritten. The duplicates
                          * have to be within the radar.scan number of seconds.
                          */
-                        shortDetects.put(mdhash, dbk);
+                        shortDetects.put(mdhash, block);
                     } else {
-                        longDetects.add(dbk);
+                        longDetects.add(block);
                     }
                 } catch (IndexOutOfBoundsException dbk3) {
                 }
@@ -785,7 +749,7 @@ public final class DataBlockParser extends Thread {
                          * See if this ICAO exists yet in the squawk table, and
                          * only if the squawk is new, drop it in.
                          */
-                        squawk = trk.getSquawk();
+                        String squawk = trk.getSquawk();
 
                         if (squawk.equals("") == false) {
                             queryString = String.format("SELECT count(*) AS SK"
@@ -882,7 +846,7 @@ public final class DataBlockParser extends Thread {
                          * We now process registrations
                          * Check for duplicates
                          */
-                        registration = trk.getRegistration();
+                        String registration = trk.getRegistration();
 
                         if (registration.equals("") == false) {
                             queryString = String.format("SELECT count(*) AS RG FROM modes.icao_list "
@@ -918,7 +882,7 @@ public final class DataBlockParser extends Thread {
                          * We now process callsigns
                          * Check for duplicates
                          */
-                        callsign = trk.getCallsign();
+                        String callsign = trk.getCallsign();
 
                         if (callsign.equals("") == false) {     // false = has callsign
                             queryString = String.format("SELECT count(*) AS CS FROM modes.callsign_list"
@@ -1245,7 +1209,20 @@ public final class DataBlockParser extends Thread {
     private void parseShortDetects() {
         Collection<DataBlock> scan = shortDetects.values();
         Iterator<DataBlock> iterator = scan.iterator();
-
+        DataBlock dbk;
+        String data;
+        String icao_number;
+        String squawk;
+        int amplitude;
+        int altitude;
+        int radarIID;
+        boolean isOnGround;
+        boolean emergency;
+        boolean alert;
+        boolean spi;
+        boolean si;
+        long detectTime;
+        
         while (iterator.hasNext()) {
 
             dbk = iterator.next();
@@ -1408,7 +1385,27 @@ public final class DataBlockParser extends Thread {
 
     private void parseLongDetects() {
         Iterator<DataBlock> iterator = longDetects.iterator();
-
+        DataBlock dbk;
+        String data;
+        String icao_number;
+        String squawk;
+        String callsign;
+        int amplitude;
+        int altitude;
+        int vSpeed;
+        int category;
+        int subtype3;
+        boolean isOnGround;
+        boolean emergency;
+        boolean alert;
+        boolean spi;
+        long detectTime;
+        long data56;
+        float groundSpeed;
+        float trueHeading;
+        float magneticHeading;
+        float airspeed;
+   
         while (iterator.hasNext()) {
             
             dbk = longDetects.remove(0);
