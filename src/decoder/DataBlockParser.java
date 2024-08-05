@@ -181,9 +181,11 @@ public final class DataBlockParser extends Thread {
 
     /*
      * On startup make sure all tracks are set to non-active
+     * and reset the quality to 0.
      */
     public void initializeTracks() {
-        String queryString = String.format("UPDATE modes.tracks SET active = 0");
+        String queryString = String.format("UPDATE modes.tracks SET active = 0,"
+                + "quality = 0");
 
         try (Statement query = db.createStatement()) {
             query.executeUpdate(queryString);
@@ -239,8 +241,11 @@ public final class DataBlockParser extends Thread {
 
        /*
         * Assuming it was copied to the database
+        *
+        * Set the database track inactive, and quality to 0.
         */
-        String queryString = String.format("UPDATE modes.tracks SET active = 0 WHERE icao_number='%s'", icao);
+        String queryString = String.format("UPDATE modes.tracks SET active = 0,"
+                + "quality = 0 WHERE icao_number='%s'", icao);
 
         try (Statement query = db.createStatement()) {
             query.executeUpdate(queryString);
