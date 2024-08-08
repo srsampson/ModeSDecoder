@@ -35,8 +35,3 @@ Apache NetBeans IDE 22
 Java: 22.0.1; OpenJDK 64-Bit Server VM 22.0.1+8-16   
 Runtime: OpenJDK Runtime Environment 22.0.1+8-16   
 System: Windows 11 version 10.0 running on amd64; UTF-8; en_US (nb)   
-
-#### Analytics
-This application, even in its earlier version, has never been very popular. I think its a cross between being in Java, and using MySQL.
-I tried using SQLite Database, but that didn't gain any interest, so I assume it's the Java that people don't want to put on their computers.
-Anyway, I get about one or two visits a week from lost souls... My interest is slowly improving the database.
